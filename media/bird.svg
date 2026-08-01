@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- body -->
+  <ellipse cx="12" cy="14" rx="5" ry="4"/>
+  <!-- head -->
+  <circle cx="16" cy="9" r="2.5"/>
+  <!-- beak -->
+  <path d="M18 9 l2.5 0.5 l-2 1"/>
+  <!-- wing -->
+  <path d="M7 13 Q4 10 5 7 Q8 9 12 10"/>
+  <!-- tail -->
+  <path d="M7 15 Q5 17 4 19 Q6 17 8 18"/>
+  <!-- eye -->
+  <circle cx="16.8" cy="8.7" r="0.4" fill="currentColor"/>
+</svg>
