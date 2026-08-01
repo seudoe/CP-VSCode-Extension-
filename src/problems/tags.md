@@ -1,0 +1,20 @@
+- greedy
+- dp
+- graphs
+- trees
+- strings
+- math
+- binary search
+- brute force
+- implementation
+- data structures
+- constructive algorithms
+- number theory
+- combinatorics
+- bitmasks
+- two pointers
+- dfs and similar
+- shortest paths
+- geometry
+- sortings
+- interactive
