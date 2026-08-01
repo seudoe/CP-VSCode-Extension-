@@ -5,6 +5,8 @@ import { readRatingDb, buildRatingDb, sortedRatingKeys, RatingGroup, RATING_RANK
 import { readTagDb, buildTagDb, sortedTagKeys, TagGroup, OTHER_TAG_KEY } from './problems/tag-db';
 import { readContestDb, ContestDB, ContestWithProblems } from './problems/contest-db';
 import { CFProblem } from './problems/cf-api';
+import { initScraperDirs, scrapeProblem, isCached, readCache } from './scraper/scraper';
+import { renderProblem } from './scraper/renderer';
 
 // ── CF rank color map ────────────────────────────────────────────────────────
 // Source: https://gist.github.com/algon-320/4369c85b34cb4f76a7f843a5a803125b
@@ -112,7 +114,7 @@ class ContestItem extends vscode.TreeItem {
 }
 
 class ProblemItem extends vscode.TreeItem {
-  constructor(problem: CFProblem) {
+  constructor(public readonly problem: CFProblem) {
     const id = problem.contestId
       ? `${problem.contestId}${problem.index}`
       : problem.index;
@@ -122,6 +124,12 @@ class ProblemItem extends vscode.TreeItem {
       ? `Tags: ${problem.tags.join(', ')}`
       : 'No tags';
     this.contextValue = 'problem';
+    // Fire the open command when clicked
+    this.command = {
+      command: 'seudoe.openProblem',
+      title: 'Open Problem',
+      arguments: [problem],
+    };
   }
 }
 
@@ -282,6 +290,82 @@ class TestCasesProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   }
 }
 
+// ── Webview panel manager ────────────────────────────────────────────────────
+
+let currentPanel: vscode.WebviewPanel | undefined;
+
+async function openProblemPanel(
+  problem: CFProblem,
+  context: vscode.ExtensionContext
+): Promise<void> {
+  const { contestId, index } = problem;
+  if (!contestId) {
+    vscode.window.showWarningMessage('This problem has no contest ID — cannot open.');
+    return;
+  }
+
+  const id = `${contestId}${index}`;
+  const imagesDir = path.join(context.extensionPath, 'src', 'problems', 'local-problem-statements', 'images');
+
+  // Reuse existing panel or create a new one
+  if (currentPanel) {
+    currentPanel.reveal(vscode.ViewColumn.One);
+  } else {
+    currentPanel = vscode.window.createWebviewPanel(
+      'cfProblem',
+      `[${id}] ${problem.name}`,
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        localResourceRoots: [
+          vscode.Uri.file(path.join(context.extensionPath, 'src', 'problems', 'local-problem-statements')),
+        ],
+      }
+    );
+    currentPanel.onDidDispose(() => { currentPanel = undefined; });
+  }
+
+  // Update title immediately
+  currentPanel.title = `[${id}] ${problem.name}`;
+
+  // Show cached version instantly if available
+  const cached = readCache(contestId, index);
+  if (cached) {
+    currentPanel.webview.html = renderProblem(cached, problem, currentPanel.webview, context.extensionUri, imagesDir);
+  } else {
+    currentPanel.webview.html = loadingHtml(id, problem.name);
+  }
+
+  // Fetch/scrape in background (no-op if already cached)
+  if (!isCached(contestId, index)) {
+    try {
+      const fresh = await scrapeProblem(contestId, index);
+      // Panel might have been closed while fetching
+      if (currentPanel) {
+        currentPanel.webview.html = renderProblem(fresh, problem, currentPanel.webview, context.extensionUri, imagesDir);
+      }
+    } catch (err) {
+      console.error(`[seudoe] Scrape failed for ${id}:`, err);
+      if (currentPanel) {
+        currentPanel.webview.html = errorHtml(id, String(err));
+      }
+    }
+  }
+}
+
+function loadingHtml(id: string, name: string): string {
+  return `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:32px;color:#ccc">
+    <h2>[${id}] ${name}</h2>
+    <p>Loading problem statement…</p>
+  </body></html>`;
+}
+
+function errorHtml(id: string, msg: string): string {
+  return `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:32px;color:#f44">
+    <h2>Failed to load [${id}]</h2><pre>${msg}</pre>
+  </body></html>`;
+}
+
 // ── Activation ───────────────────────────────────────────────────────────────
 
 export function activate(context: vscode.ExtensionContext) {
@@ -290,6 +374,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Save DB files into src/problems/local-database inside the extension folder
   const dbStoragePath = path.join(context.extensionPath, 'src', 'problems');
   initDb(dbStoragePath);
+  initScraperDirs(context.extensionPath);
 
   const problemsProvider = new ProblemsProvider();
   vscode.window.registerTreeDataProvider('seudoe.problemsView', problemsProvider);
@@ -297,6 +382,13 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(new RatingDecorationProvider())
+  );
+
+  // Open problem on click
+  context.subscriptions.push(
+    vscode.commands.registerCommand('seudoe.openProblem', (problem: CFProblem) => {
+      openProblemPanel(problem, context);
+    })
   );
 
   syncProblems(problemsProvider);
