@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { initDb, readDb, isUpToDate, refreshDb, ensureDerivedDbs } from './problems/load-db';
 import { readRatingDb, buildRatingDb, sortedRatingKeys, RatingGroup, RATING_RANK_LABEL, UNKNOWN_RATING_KEY } from './problems/rating-db';
 import { readTagDb, buildTagDb, sortedTagKeys, TagGroup, OTHER_TAG_KEY } from './problems/tag-db';
 import { readContestDb, ContestDB, ContestWithProblems } from './problems/contest-db';
 import { CFProblem } from './problems/cf-api';
-import { initScraperDirs, scrapeProblem, isCached, readCache } from './scraper/scraper';
-import { renderProblem } from './scraper/renderer';
+import { fetchProblem, fetchImage, closeDb } from './problems/db';
+import { renderProblem } from './problems/renderer';
 
 // ── CF rank color map ────────────────────────────────────────────────────────
 // Source: https://gist.github.com/algon-320/4369c85b34cb4f76a7f843a5a803125b
@@ -305,7 +304,6 @@ async function openProblemPanel(
   }
 
   const id = `${contestId}${index}`;
-  const imagesDir = path.join(context.extensionPath, 'src', 'problems', 'local-problem-statements', 'images');
 
   // Reuse existing panel or create a new one
   if (currentPanel) {
@@ -317,38 +315,56 @@ async function openProblemPanel(
       vscode.ViewColumn.One,
       {
         enableScripts: true,
-        localResourceRoots: [
-          vscode.Uri.file(path.join(context.extensionPath, 'src', 'problems', 'local-problem-statements')),
-        ],
+        // No local resource roots needed — images are served via postMessage
       }
     );
     currentPanel.onDidDispose(() => { currentPanel = undefined; });
   }
 
-  // Update title immediately
+  // Update title
   currentPanel.title = `[${id}] ${problem.name}`;
 
-  // Show cached version instantly if available
-  const cached = readCache(contestId, index);
-  if (cached) {
-    currentPanel.webview.html = renderProblem(cached, problem, currentPanel.webview, context.extensionUri, imagesDir);
-  } else {
-    currentPanel.webview.html = loadingHtml(id, problem.name);
-  }
+  // Show loading state while fetching from MongoDB
+  currentPanel.webview.html = loadingHtml(id, problem.name);
 
-  // Fetch/scrape in background (no-op if already cached)
-  if (!isCached(contestId, index)) {
+  // Handle image requests from the webview
+  const imageListener = currentPanel.webview.onDidReceiveMessage(async (msg) => {
+    if (msg.type !== 'fetchImage' || !currentPanel) { return; }
     try {
-      const fresh = await scrapeProblem(contestId, index);
-      // Panel might have been closed while fetching
-      if (currentPanel) {
-        currentPanel.webview.html = renderProblem(fresh, problem, currentPanel.webview, context.extensionUri, imagesDir);
+      const result = await fetchImage(msg.filename as string);
+      if (result && currentPanel) {
+        const base64 = result.buffer.toString('base64');
+        currentPanel.webview.postMessage({
+          type: 'imageData',
+          filename: msg.filename,
+          dataUri: `data:${result.contentType};base64,${base64}`,
+        });
       }
     } catch (err) {
-      console.error(`[seudoe] Scrape failed for ${id}:`, err);
+      console.error(`[seudoe] Failed to load image ${msg.filename}:`, err);
+    }
+  });
+  context.subscriptions.push(imageListener);
+
+  // Fetch problem from MongoDB
+  try {
+    const cached = await fetchProblem(contestId, index);
+    if (!cached) {
       if (currentPanel) {
-        currentPanel.webview.html = errorHtml(id, String(err));
+        currentPanel.webview.html = errorHtml(
+          id,
+          `Problem ${id} not found in database.\n\nRun the Python scraper first:\n  cd CF-scraper-python\n  python app.py\nthen POST /sync`
+        );
       }
+      return;
+    }
+    if (currentPanel) {
+      currentPanel.webview.html = renderProblem(cached, problem, currentPanel.webview, context.extensionUri);
+    }
+  } catch (err) {
+    console.error(`[seudoe] MongoDB fetch failed for ${id}:`, err);
+    if (currentPanel) {
+      currentPanel.webview.html = errorHtml(id, String(err));
     }
   }
 }
@@ -371,10 +387,9 @@ function errorHtml(id: string, msg: string): string {
 export function activate(context: vscode.ExtensionContext) {
   console.log('Extension "seudoe" is now active!');
 
-  // Save DB files into src/problems/local-database inside the extension folder
-  const dbStoragePath = path.join(context.extensionPath, 'src', 'problems');
+  // Save DB files into extension's global storage path
+  const dbStoragePath = context.extensionPath;
   initDb(dbStoragePath);
-  initScraperDirs(context.extensionPath);
 
   const problemsProvider = new ProblemsProvider();
   vscode.window.registerTreeDataProvider('seudoe.problemsView', problemsProvider);
@@ -419,4 +434,6 @@ async function syncProblems(provider: ProblemsProvider): Promise<void> {
   }
 }
 
-export function deactivate() {}
+export function deactivate() {
+  closeDb().catch(console.error);
+}
