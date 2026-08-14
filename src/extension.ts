@@ -129,6 +129,12 @@ class ProblemItem extends vscode.TreeItem {
       ? `Tags: ${problem.tags.join(', ')}`
       : 'No tags';
     this.contextValue = 'problem';
+
+    const ratingKey = problem.rating ? String(problem.rating) : UNKNOWN_RATING_KEY;
+    this.resourceUri = vscode.Uri.parse(
+      `${CF_RATING_SCHEME}://${encodeURIComponent(ratingKey)}`
+    );
+
     // Fire the open command when clicked
     this.command = {
       command: 'seudoe.openProblem',
