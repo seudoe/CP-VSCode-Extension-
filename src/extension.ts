@@ -315,7 +315,9 @@ async function openProblemPanel(
       vscode.ViewColumn.One,
       {
         enableScripts: true,
-        // No local resource roots needed — images are served via postMessage
+        localResourceRoots: [
+          vscode.Uri.joinPath(context.extensionUri, 'media'),
+        ],
       }
     );
     currentPanel.onDidDispose(() => { currentPanel = undefined; });

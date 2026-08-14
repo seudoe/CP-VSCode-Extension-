@@ -1,6 +1,113 @@
 {
-  "lastUpdated": "2026-08-08",
+  "lastUpdated": "2026-08-14",
   "problems": [
+    {
+      "contestId": 2256,
+      "index": "B",
+      "name": "Domino Tiles",
+      "type": "PROGRAMMING",
+      "points": 1000,
+      "tags": [
+        "implementation",
+        "math"
+      ]
+    },
+    {
+      "contestId": 2256,
+      "index": "A",
+      "name": "Three Numbers on the Blackboard",
+      "type": "PROGRAMMING",
+      "points": 500,
+      "tags": [
+        "math",
+        "sortings"
+      ]
+    },
+    {
+      "contestId": 2255,
+      "index": "F",
+      "name": "Who Will Witness the End?",
+      "type": "PROGRAMMING",
+      "points": 3500,
+      "tags": [
+        "fft",
+        "math"
+      ]
+    },
+    {
+      "contestId": 2255,
+      "index": "E2",
+      "name": "What Will Remain at the End? (Hard Version)",
+      "type": "PROGRAMMING",
+      "points": 1250,
+      "tags": [
+        "data structures"
+      ]
+    },
+    {
+      "contestId": 2255,
+      "index": "E1",
+      "name": "What Will Remain at the End? (Easy Version)",
+      "type": "PROGRAMMING",
+      "points": 1750,
+      "tags": [
+        "brute force",
+        "data structures"
+      ]
+    },
+    {
+      "contestId": 2255,
+      "index": "D",
+      "name": "How Long Until Nothing Remains?",
+      "type": "PROGRAMMING",
+      "points": 1750,
+      "tags": [
+        "binary search",
+        "bitmasks",
+        "data structures",
+        "greedy",
+        "math",
+        "sortings"
+      ]
+    },
+    {
+      "contestId": 2255,
+      "index": "C",
+      "name": "Even If the World Turns",
+      "type": "PROGRAMMING",
+      "points": 1750,
+      "tags": [
+        "communication",
+        "constructive algorithms",
+        "greedy",
+        "interactive",
+        "math",
+        "number theory"
+      ]
+    },
+    {
+      "contestId": 2255,
+      "index": "B",
+      "name": "A Ribbon for Tomorrow",
+      "type": "PROGRAMMING",
+      "points": 1000,
+      "tags": [
+        "combinatorics",
+        "math"
+      ]
+    },
+    {
+      "contestId": 2255,
+      "index": "A",
+      "name": "Hot Potatoes at the Fairy Warehouse",
+      "type": "PROGRAMMING",
+      "points": 500,
+      "tags": [
+        "games",
+        "greedy",
+        "implementation"
+      ]
+    },
     {
       "contestId": 2254,
       "index": "G",
@@ -98,7 +205,8 @@
         "bitmasks",
         "dp",
         "graphs",
-        "math"
+        "math",
+        "number theory"
       ]
     },
     {
@@ -111,6 +219,7 @@
         "dfs and similar",
         "fft",
         "graphs",
+        "implementation",
         "trees"
       ]
     },
@@ -185,7 +294,6 @@
         "bitmasks",
         "combinatorics",
         "dp",
-        "games",
         "math"
       ]
     },

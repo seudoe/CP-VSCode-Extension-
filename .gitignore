@@ -4,3 +4,11 @@ node_modules
 .vscode-test/
 *.vsix
 scraperHelp.md
+
+.env.local
+.env.*
+*.env
+*.env.local
+
+/DEBUGGING-RENDERER-FILES
+DEBUGGING-RENDERER-FILES/

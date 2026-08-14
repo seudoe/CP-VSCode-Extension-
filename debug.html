@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>[2199F] F. Self-Produced Sequences</title>
+
+<link rel="stylesheet" href="media/katex.min.css">
+
+<style nonce="9e89ee1cee3786a9">
+.katex { line-height: 1.2; }
+/* Hide Codeforces MathJax previews which are sometimes left in the HTML */
+.MathJax_Preview, .MathJax, .MathJax_Processing, .MathJax_Processed, .MJX_Assistive_MathML { display: none !important; }
+.katex, .katex * { box-sizing: content-box; }
+
+/* ── Tokens ── */
+:root {
+  --bg:       var(--vscode-editor-background);
+  --fg:       var(--vscode-editor-foreground);
+  --muted:    var(--vscode-descriptionForeground, #888);
+  --border:   var(--vscode-panel-border, #3a3a3a);
+  --accent:   #4e9eff;
+  --card:     var(--vscode-sideBar-background, #1c1c1c);
+  --pre-bg:   var(--vscode-textBlockQuote-background, #232323);
+  --tag-bg:   var(--vscode-badge-background, #2a2a2a);
+  --tag-fg:   var(--vscode-badge-foreground, #bbb);
+  --rating:   #AA00AA;
+  --r:        6px;
+}
+
+* { margin: 0; padding: 0; }
+
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--fg);
+  background: var(--bg);
+  padding: 0 28px 72px;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.hdr { padding: 24px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 28px; }
+.contest-pill {
+  display: inline-block;
+  font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+}
+.prob-title { font-size: 23px; font-weight: 700; line-height: 1.3; }
+
+/* ── Meta pills ── */
+.meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 13px; color: var(--muted);
+}
+.pill strong { color: var(--fg); font-weight: 600; }
+.pill-rating { border-color: var(--rating); }
+.pill-rating strong { color: var(--rating); }
+
+/* ── Collapsible detail rows ── */
+.detail { margin-top: 10px; }
+.detail-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: none; padding: 0;
+  font: inherit; font-size: 12px; color: var(--muted);
+  cursor: pointer;
+}
+.detail-btn:hover { color: var(--fg); }
+.chev { font-size: 9px; transition: transform .15s; display: inline-block; }
+.chev.open { transform: rotate(90deg); }
+.detail-body { display: none; padding: 8px 0 2px; }
+.detail-body.open { display: block; }
+
+/* ── Tags ── */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  background: var(--tag-bg); color: var(--tag-fg);
+  border-radius: 4px; padding: 3px 9px; font-size: 12px;
+}
+.muted { color: var(--muted); font-size: 13px; }
+
+/* ── Sections ── */
+.section { margin: 28px 0; }
+.sec-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted);
+  padding-bottom: 7px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Text / paragraphs ── */
+p { margin: 10px 0; font-size: 15px; }
+
+/* CF tex-span formatting classes */
+.tex-font-style-bf, b, strong { font-weight: 700; }
+.tex-font-style-it, i, em     { font-style: italic; }
+.tex-font-style-tt            { font-family: "Consolas","Menlo",monospace; font-size: .9em; }
+.tex-font-style-sl            { font-style: oblique; }
+.upper-index                  { vertical-align: super; font-size: .72em; line-height: 0; }
+.lower-index                  { vertical-align: sub;   font-size: .72em; line-height: 0; }
+
+/* ── Code / pre ── */
+pre, code { font-family: "Consolas","Menlo","Courier New",monospace; }
+pre {
+  background: var(--pre-bg); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 14px 16px;
+  overflow-x: auto; font-size: 13.5px; line-height: 1.6;
+  margin: 10px 0; white-space: pre;
+}
+
+/* ── Images ── */
+img { max-width: 100%; border-radius: 4px; margin: 10px 0; display: block; }
+
+/* ── Tables ── */
+.table-wrap { overflow-x: auto; margin: 10px 0; }
+table { border-collapse: collapse; min-width: 100%; font-size: 14px; }
+td, th { border: 1px solid var(--border); padding: 7px 12px; text-align: left; }
+th { background: var(--card); font-weight: 600; }
+
+/* ── Lists ── */
+ul, ol { padding-left: 26px; margin: 10px 0; }
+li { margin: 5px 0; }
+
+/* ── Examples ── */
+.example {
+  border: 1px solid var(--border); border-radius: var(--r);
+  overflow: hidden; margin: 12px 0; background: var(--card);
+}
+.example-head {
+  padding: 9px 14px; background: var(--pre-bg);
+  border-bottom: 1px solid var(--border);
+}
+.example-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--accent);
+}
+.io-block { border-bottom: 1px solid var(--border); }
+.io-block:last-of-type { border-bottom: none; }
+.io-bar {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px 3px;
+}
+.io-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--muted);
+}
+.copy-btn {
+  font: inherit; font-size: 11px;
+  background: var(--tag-bg); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 2px 8px; cursor: pointer;
+  transition: color .12s, border-color .12s;
+}
+.copy-btn:hover { color: var(--fg); border-color: var(--accent); }
+.copy-btn.ok { color: #4caf50; border-color: #4caf50; }
+
+/* io-pre: MUST have white-space:pre to show newlines */
+.io-pre {
+  margin: 0; padding: 8px 14px 12px;
+  background: transparent; border: none; border-radius: 0;
+  white-space: pre; font-size: 13.5px; line-height: 1.65;
+}
+.example-note {
+  padding: 10px 14px; font-size: 13px; color: var(--muted);
+  border-top: 1px solid var(--border); background: var(--pre-bg);
+}
+
+/* ── KaTeX ── */
+.katex-display { margin: 16px 0; overflow-x: auto; }
+.math-error { color: #f44; font-family: monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="hdr">
+  <div class="contest-pill">Contest 2199 &middot; Problem F</div>
+  <div class="prob-title">F. Self-Produced Sequences</div>
+
+  <div class="meta-row">
+    <span class="pill"><span>&#9201;</span><strong>2 seconds</strong></span>
+    <span class="pill"><span>&#128190;</span><strong>512 megabytes</strong></span>
+    <span class="pill pill-rating"><strong>2000</strong><span style="opacity:.6;font-size:11px;margin-left:3px">Candidate Master</span></span>
+  </div>
+
+  <!-- Tags (collapsed by default) -->
+  <div class="detail">
+    <button class="detail-btn" onclick="tog('tags','this_btn',this)">
+      <span class="chev" id="chev-tags">&#9658;</span>
+      Tags <span style="opacity:.5;font-size:11px">(3)</span>
+    </button>
+    <div class="detail-body" id="tags">
+      <div class="tags"><span class="tag">*special</span><span class="tag">combinatorics</span><span class="tag">math</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Statement ── -->
+<div class="section"><p>Let's call an integer sequence <span class="tex-font-style-it">self-produced</span> if for every <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-1"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-2">i</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-1-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>i</mi></mrow><annotation encoding="application/x-tex">i</annotation></semantics></math></span> (<span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-3"><span class="MJXp-mn" id="MJXp-Span-4">1</span><span class="MJXp-mo" id="MJXp-Span-5" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-mi MJXp-italic" id="MJXp-Span-6">i</span><span class="MJXp-mo" id="MJXp-Span-7" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-mi MJXp-italic" id="MJXp-Span-8">n</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-2-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mo>≤</mo><mi>i</mi><mo>≤</mo><mi>n</mi></mrow><annotation encoding="application/x-tex">1 \le i \le n</annotation></semantics></math></span>) at least one of the following conditions holds:</p>
+<ul><li>ai is equal to the sum of the elements on the left (i. e. ai=i−1∑j=1aj);</li><li>ai is equal to the sum of the elements on the right (i. e. ai=n∑j=i+1aj).</li></ul>
+<p>Note that <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-55"><span class="MJXp-mn" id="MJXp-Span-56">0</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-7-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn></mrow><annotation encoding="application/x-tex">0</annotation></semantics></math></span> at the beginning/end of the sequence is also considered valid.</p>
+<p>You are given an integer array <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-57"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-58">a</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-8-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>a</mi></mrow><annotation encoding="application/x-tex">a</annotation></semantics></math></span> of size <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-59"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-60">n</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-9-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi></mrow><annotation encoding="application/x-tex">n</annotation></semantics></math></span>. Your task is to calculate the number of self-produced subsequences of the array <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-61"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-62">a</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-10-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>a</mi></mrow><annotation encoding="application/x-tex">a</annotation></semantics></math></span>. Since the answer might be large, print it modulo <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-63"><span class="MJXp-mn" id="MJXp-Span-64">998244353</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-11-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>998244353</mn></mrow><annotation encoding="application/x-tex">998244353</annotation></semantics></math></span>. Two subsequences are different if the indices of chosen elements are different.</p></div>
+
+<!-- ── Input ── -->
+<div class="section">
+  <div class="sec-title">Input</div>
+  <p>The first line contains a single integer <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-65"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-66">t</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-12-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi></mrow><annotation encoding="application/x-tex">t</annotation></semantics></math></span> (<span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-67"><span class="MJXp-mn" id="MJXp-Span-68">1</span><span class="MJXp-mo" id="MJXp-Span-69" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-mi MJXp-italic" id="MJXp-Span-70">t</span><span class="MJXp-mo" id="MJXp-Span-71" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-msubsup" id="MJXp-Span-72"><span class="MJXp-mn" id="MJXp-Span-73" style="margin-right: 0.05em;">10</span><span class="MJXp-mn MJXp-script" id="MJXp-Span-74" style="vertical-align: 0.5em;">4</span></span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-13-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mo>≤</mo><mi>t</mi><mo>≤</mo><msup><mn>10</mn><mn>4</mn></msup></mrow><annotation encoding="application/x-tex">1 \le t \le 10^4</annotation></semantics></math></span>) — the number of test cases.</p>
+<p>The first line of each test case contains a single integer <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-75"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-76">n</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-14-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi></mrow><annotation encoding="application/x-tex">n</annotation></semantics></math></span> (<span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-77"><span class="MJXp-mn" id="MJXp-Span-78">1</span><span class="MJXp-mo" id="MJXp-Span-79" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-mi MJXp-italic" id="MJXp-Span-80">n</span><span class="MJXp-mo" id="MJXp-Span-81" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-mn" id="MJXp-Span-82">2</span><span class="MJXp-mo" id="MJXp-Span-83" style="margin-left: 0.267em; margin-right: 0.267em;">⋅</span><span class="MJXp-msubsup" id="MJXp-Span-84"><span class="MJXp-mn" id="MJXp-Span-85" style="margin-right: 0.05em;">10</span><span class="MJXp-mn MJXp-script" id="MJXp-Span-86" style="vertical-align: 0.5em;">5</span></span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-15-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mo>≤</mo><mi>n</mi><mo>≤</mo><mn>2</mn><mo>⋅</mo><msup><mn>10</mn><mn>5</mn></msup></mrow><annotation encoding="application/x-tex">1 \le n \le 2 \cdot 10^5</annotation></semantics></math></span>).</p>
+<p>The second line contains <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-87"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-88">n</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-16-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi></mrow><annotation encoding="application/x-tex">n</annotation></semantics></math></span> integers <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-89"><span class="MJXp-msubsup" id="MJXp-Span-90"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-91" style="margin-right: 0.05em;">a</span><span class="MJXp-mn MJXp-script" id="MJXp-Span-92" style="vertical-align: -0.4em;">1</span></span><span class="MJXp-mo" id="MJXp-Span-93" style="margin-left: 0em; margin-right: 0.222em;">,</span><span class="MJXp-msubsup" id="MJXp-Span-94"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-95" style="margin-right: 0.05em;">a</span><span class="MJXp-mn MJXp-script" id="MJXp-Span-96" style="vertical-align: -0.4em;">2</span></span><span class="MJXp-mo" id="MJXp-Span-97" style="margin-left: 0em; margin-right: 0.222em;">,</span><span class="MJXp-mo" id="MJXp-Span-98" style="margin-left: 0em; margin-right: 0em;">…</span><span class="MJXp-mo" id="MJXp-Span-99" style="margin-left: 0em; margin-right: 0.222em;">,</span><span class="MJXp-msubsup" id="MJXp-Span-100"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-101" style="margin-right: 0.05em;">a</span><span class="MJXp-mi MJXp-italic MJXp-script" id="MJXp-Span-102" style="vertical-align: -0.4em;">n</span></span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-17-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>a</mi><mn>1</mn></msub><mo separator="true">,</mo><msub><mi>a</mi><mn>2</mn></msub><mo separator="true">,</mo><mo>…</mo><mo separator="true">,</mo><msub><mi>a</mi><mi>n</mi></msub></mrow><annotation encoding="application/x-tex">a_1, a_2, \dots, a_n</annotation></semantics></math></span> (<span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-103"><span class="MJXp-mn" id="MJXp-Span-104">0</span><span class="MJXp-mo" id="MJXp-Span-105" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-msubsup" id="MJXp-Span-106"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-107" style="margin-right: 0.05em;">a</span><span class="MJXp-mi MJXp-italic MJXp-script" id="MJXp-Span-108" style="vertical-align: -0.4em;">i</span></span><span class="MJXp-mo" id="MJXp-Span-109" style="margin-left: 0.333em; margin-right: 0.333em;">≤</span><span class="MJXp-msubsup" id="MJXp-Span-110"><span class="MJXp-mn" id="MJXp-Span-111" style="margin-right: 0.05em;">10</span><span class="MJXp-mn MJXp-script" id="MJXp-Span-112" style="vertical-align: 0.5em;">9</span></span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-18-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0</mn><mo>≤</mo><msub><mi>a</mi><mi>i</mi></msub><mo>≤</mo><msup><mn>10</mn><mn>9</mn></msup></mrow><annotation encoding="application/x-tex">0 \le a_i \le 10^9</annotation></semantics></math></span>).</p>
+<p>Additional constraint on the input: the sum of <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-113"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-114">n</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-19-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi></mrow><annotation encoding="application/x-tex">n</annotation></semantics></math></span> over all test cases doesn't exceed <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-115"><span class="MJXp-mn" id="MJXp-Span-116">2</span><span class="MJXp-mo" id="MJXp-Span-117" style="margin-left: 0.267em; margin-right: 0.267em;">⋅</span><span class="MJXp-msubsup" id="MJXp-Span-118"><span class="MJXp-mn" id="MJXp-Span-119" style="margin-right: 0.05em;">10</span><span class="MJXp-mn MJXp-script" id="MJXp-Span-120" style="vertical-align: 0.5em;">5</span></span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-20-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>2</mn><mo>⋅</mo><msup><mn>10</mn><mn>5</mn></msup></mrow><annotation encoding="application/x-tex">2 \cdot 10^5</annotation></semantics></math></span>.</p>
+</div>
+
+<!-- ── Output ── -->
+<div class="section">
+  <div class="sec-title">Output</div>
+  <p>For each test case, print a single integer — the number of self-produced subsequences of the array <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-121"><span class="MJXp-mi MJXp-italic" id="MJXp-Span-122">a</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-21-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>a</mi></mrow><annotation encoding="application/x-tex">a</annotation></semantics></math></span> taken modulo <span class="MathJax_Preview" style="color: inherit;"><span class="MJXp-math" id="MJXp-Span-123"><span class="MJXp-mn" id="MJXp-Span-124">998244353</span></span></span><span class="MathJax MathJax_Processing" id="MathJax-Element-22-Frame" tabindex="0"></span><span class="katex"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>998244353</mn></mrow><annotation encoding="application/x-tex">998244353</annotation></semantics></math></span>.</p>
+</div>
+
+<!-- ── Examples ── -->
+<div class="section">
+  <div class="sec-title">Examples</div>
+  
+<div class="example">
+  <div class="example-head">
+    <span class="example-label">Example 1</span>
+  </div>
+  <div class="io-block">
+    <div class="io-bar">
+      <span class="io-label">Input</span>
+      <button class="copy-btn" onclick="doCopy(this,'5
+3
+1 1 2
+2
+0 0
+5
+0 1 0 1 0
+6
+1 0 2 2 1 1
+11
+2 0 3 1 0 0 2 3 0 3 2')">Copy</button>
+    </div>
+    <pre class="io-pre">5
+3
+1 1 2
+2
+0 0
+5
+0 1 0 1 0
+6
+1 0 2 2 1 1
+11
+2 0 3 1 0 0 2 3 0 3 2</pre>
+  </div>
+  <div class="io-block">
+    <div class="io-bar">
+      <span class="io-label">Output</span>
+      <button class="copy-btn" onclick="doCopy(this,'2
+4
+12
+8
+41')">Copy</button>
+    </div>
+    <pre class="io-pre">2
+4
+12
+8
+41</pre>
+  </div>
+  
+</div>
+</div>
+
+
+
+
+
+
+</body>
+</html>

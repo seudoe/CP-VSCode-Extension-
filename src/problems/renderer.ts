@@ -26,7 +26,7 @@ function esc(s: string): string {
 }
 
 function ratingColor(r?: number): string {
-  if (!r)       return '#808080';
+  if (!r) return '#808080';
   if (r < 1200) return '#808080';
   if (r < 1400) return '#008000';
   if (r < 1600) return '#03A89E';
@@ -37,7 +37,7 @@ function ratingColor(r?: number): string {
 }
 
 function ratingLabel(r?: number): string {
-  if (!r)       return '';
+  if (!r) return '';
   if (r < 1200) return 'Newbie';
   if (r < 1400) return 'Pupil';
   if (r < 1600) return 'Specialist';
@@ -55,20 +55,19 @@ function ratingLabel(r?: number): string {
  * Runs server-side in the extension host — no CDN needed.
  */
 function renderMathInText(text: string): string {
-  // ── Display math $$...$$ first (must come before inline) ──
+  // Display math first
   text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_, latex) => {
     try {
-      return katex.renderToString(latex.trim(), { displayMode: true, throwOnError: false, strict: false });
+      return katex.renderToString(latex.trim(), { displayMode: true, throwOnError: false, strict: false, output: 'mathml' });
     } catch {
       return `<span class="math-error">$$${esc(latex)}$$</span>`;
     }
   });
 
-  // ── Inline math $...$ ──
-  // Skip $$ (already handled above), don't match empty $$ either
-  text = text.replace(/(?<!\$)\$(?!\$)((?:[^$\\]|\\[\s\S])+?)\$(?!\$)/g, (_, latex) => {
+  // Inline math
+  text = text.replace(/(?<!\$)\$(?!\$)([\s\S]*?)(?<!\$)\$(?!\$)/g, (_, latex) => {
     try {
-      return katex.renderToString(latex.trim(), { displayMode: false, throwOnError: false, strict: false });
+      return katex.renderToString(latex.trim(), { displayMode: false, throwOnError: false, strict: false, output: 'mathml' });
     } catch {
       return `<span class="math-error">$${esc(latex)}$</span>`;
     }
@@ -83,27 +82,30 @@ function blockToHtml(block: Block): string {
   switch (block.type) {
 
     case 'paragraph': {
-      // tex-span era: block.html already has formatted HTML (<i>, <sup class="upper-index">, etc.)
-      // Check for CF formatting class names
-      const isTexSpan = block.html && (
-        block.html.includes('tex-font-style') ||
-        block.html.includes('class="tex-span"') ||
-        block.html.includes('upper-index') ||
-        block.html.includes('lower-index')
-      );
+      // Prioritize HTML to avoid duplicate text bugs caused by the scraper's plaintext extraction
+      if (block.html) {
+        let cleanHtml = block.html;
+        
+        // Convert the MathJax script tags to standard KaTeX blocks
+        cleanHtml = cleanHtml.replace(/<script[^>]*type="math\/tex; mode=display"[^>]*>([\s\S]*?)<\/script>/g, (_, tex) => {
+          return renderMathInText('$$' + tex + '$$');
+        });
+        cleanHtml = cleanHtml.replace(/<script[^>]*type="math\/tex"[^>]*>([\s\S]*?)<\/script>/g, (_, tex) => {
+          return renderMathInText('$' + tex + '$');
+        });
 
-      if (isTexSpan) {
-        // Inject as-is — CF already formatted it
-        return `<p>${block.html}</p>`;
+        // Any leftover script tags are errors
+        cleanHtml = cleanHtml.replace(/<script[^>]*>([\s\S]*?)<\/script>/g, (_, latex) => `<span class="math-error">${esc(latex)}</span>`);
+        
+        return `<p>${cleanHtml}</p>`;
       }
 
-      // mathjax era: block.text has $...$ — run KaTeX server-side
-      const text = block.text ?? block.html ?? '';
-      // Escape HTML special chars EXCEPT we want KaTeX output (raw HTML) to pass through
-      // So: first render math (returns HTML strings), then the remaining plain text is safe
-      // because block.text is plain text (no HTML tags outside of math)
-      const withMath = renderMathInText(text);
-      return `<p>${withMath}</p>`;
+      // Fallback to text if HTML isn't available
+      if (block.text != null && block.text !== '') {
+        return `<p>${renderMathInText(block.text)}</p>`;
+      }
+
+      return '<p></p>';
     }
 
     case 'code':
@@ -192,14 +194,14 @@ export function renderProblem(
   _extensionUri: vscode.Uri,
 ): string {
   const { statement, contestId, index } = cached;
-  const id    = `${contestId}${index}`;
+  const id = `${contestId}${index}`;
   const color = ratingColor(meta?.rating);
   const label = ratingLabel(meta?.rating);
 
-  const descHtml     = blocksToHtml(statement.description);
-  const inputHtml    = blocksToHtml(statement.input);
-  const outputHtml   = blocksToHtml(statement.output);
-  const noteHtml     = statement.note ? blocksToHtml(statement.note) : '';
+  const descHtml = blocksToHtml(statement.description);
+  const inputHtml = blocksToHtml(statement.input);
+  const outputHtml = blocksToHtml(statement.output);
+  const noteHtml = statement.note ? blocksToHtml(statement.note) : '';
   const examplesHtml = renderExamples(statement.examples);
 
   const tagsHtml = meta?.tags?.length
@@ -210,28 +212,34 @@ export function renderProblem(
     Math.floor(Math.random() * 16).toString(16)
   ).join('');
 
-  // KaTeX fonts — inline the CSS but fonts are loaded from relative paths.
-  // We use a CDN fallback only for the fonts (not the CSS or JS).
-  const katexFontsCdn = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/fonts/';
+  // Load KaTeX CSS and fonts from the local media directory
+  const cssUri = _webview.asWebviewUri(vscode.Uri.joinPath(_extensionUri, 'media', 'katex.min.css')).toString();
 
-  return /* html */`<!DOCTYPE html>
+  console.log('--- renderProblem ---');
+  console.log('Contest ID:', contestId, 'Index:', index);
+  console.log('CSS Webview URI:', cssUri);
+
+  const html = /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'none';
-           style-src 'nonce-${nonce}' https://cdn.jsdelivr.net;
-           font-src https://cdn.jsdelivr.net;
-           img-src data: https: vscode-resource:;
-           script-src 'nonce-${nonce}';">
+content="default-src 'none';
+style-src 'nonce-${nonce}' ${_webview.cspSource} 'unsafe-inline';
+font-src ${_webview.cspSource} data:;
+img-src data: https: ${_webview.cspSource};
+script-src 'nonce-${nonce}';">
 <title>[${id}] ${esc(statement.title)}</title>
 
-<!-- KaTeX CSS from CDN (fonts need CDN anyway) -->
-<link nonce="${nonce}" rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="${cssUri}">
 
 <style nonce="${nonce}">
+.katex { line-height: 1.2; }
+/* Hide Codeforces MathJax previews which are sometimes left in the HTML */
+.MathJax_Preview, .MathJax, .MathJax_Processing, .MathJax_Processed, .MJX_Assistive_MathML { display: none !important; }
+.katex, .katex * { box-sizing: content-box; }
+
 /* ── Tokens ── */
 :root {
   --bg:       var(--vscode-editor-background);
@@ -247,7 +255,8 @@ export function renderProblem(
   --r:        6px;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+* { margin: 0; padding: 0; }
+
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -484,6 +493,24 @@ ${noteHtml ? `
   });
 </script>
 
+
 </body>
 </html>`;
+
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    let debugHtml = html
+      .replace(/<meta http-equiv="Content-Security-Policy"[^>]+>/, '') // Remove CSP so browser doesn't block CSS
+      .replace(/href="[^"]+katex\.min\.css"/, 'href="media/katex.min.css"');
+
+    // We also need to remove the <script nonce> block entirely because it uses acquireVsCodeApi() which throws outside vscode
+    debugHtml = debugHtml.replace(/<script nonce="[^"]+">[\s\S]*?<\/script>/, '');
+
+    fs.writeFileSync(path.join(_extensionUri.fsPath, 'debug.html'), debugHtml);
+  } catch (e) {
+    console.error('Failed to dump debug.html', e);
+  }
+
+  return html;
 }
