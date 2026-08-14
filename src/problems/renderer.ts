@@ -145,14 +145,14 @@ function renderExamples(examples: Example[]): string {
   <div class="io-block">
     <div class="io-bar">
       <span class="io-label">Input</span>
-      <button class="copy-btn" onclick="doCopy(this,'${esc(ex.input)}')">Copy</button>
+      <button class="copy-btn" data-copy="${esc(ex.input)}">Copy</button>
     </div>
     <pre class="io-pre">${esc(ex.input)}</pre>
   </div>
   <div class="io-block">
     <div class="io-bar">
       <span class="io-label">Output</span>
-      <button class="copy-btn" onclick="doCopy(this,'${esc(ex.output)}')">Copy</button>
+      <button class="copy-btn" data-copy="${esc(ex.output)}">Copy</button>
     </div>
     <pre class="io-pre">${esc(ex.output)}</pre>
   </div>
@@ -419,7 +419,7 @@ li { margin: 5px 0; }
 
   <!-- Tags (collapsed by default) -->
   <div class="detail">
-    <button class="detail-btn" onclick="tog('tags','this_btn',this)">
+    <button class="detail-btn" id="btn-tags">
       <span class="chev" id="chev-tags">&#9658;</span>
       Tags${meta?.tags?.length ? ` <span style="opacity:.5;font-size:11px">(${meta.tags.length})</span>` : ''}
     </button>
@@ -458,12 +458,13 @@ ${noteHtml ? `
 
 <script nonce="${nonce}">
   // ── Collapsible ────────────────────────────────────────────────────────────
-  function tog(id, _, btn) {
+  function tog(id) {
     const body = document.getElementById(id);
     const chev = document.getElementById('chev-' + id);
     const open = body.classList.toggle('open');
     if (chev) chev.classList.toggle('open', open);
   }
+  document.getElementById('btn-tags')?.addEventListener('click', () => tog('tags'));
 
   // ── Copy ───────────────────────────────────────────────────────────────────
   function doCopy(btn, text) {
@@ -478,6 +479,9 @@ ${noteHtml ? `
     btn.classList.add('ok');
     setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1500);
   }
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => doCopy(btn, btn.getAttribute('data-copy')));
+  });
 
   // ── Images via postMessage ─────────────────────────────────────────────────
   const vsApi = acquireVsCodeApi();
