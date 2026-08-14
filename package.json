@@ -21,6 +21,11 @@
         "command": "seudoe.searchProblems",
         "title": "Search Problems",
         "icon": "$(search)"
+      },
+      {
+        "command": "seudoe.searchPastContests",
+        "title": "Search Past Contests",
+        "icon": "$(search)"
       }
     ],
     "menus": {
@@ -28,6 +33,11 @@
         {
           "command": "seudoe.searchProblems",
           "when": "view == seudoe.problemsView && viewItem == problemCategoryAll",
+          "group": "inline"
+        },
+        {
+          "command": "seudoe.searchPastContests",
+          "when": "view == seudoe.problemsView && viewItem == problemCategoryPast",
           "group": "inline"
         }
       ]

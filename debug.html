@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>[363A] A. Soroban</title>
+<title>[581E] E. Kojiro and Furrari</title>
 
 <link rel="stylesheet" href="media/katex.min.css">
 
-<style nonce="1a83a3a09a70c657">
+<style nonce="b18f74e8727a3319">
 .katex { line-height: 1.2; }
 /* Hide Codeforces MathJax previews which are sometimes left in the HTML */
 .MathJax_Preview, .MathJax, .MathJax_Processing, .MathJax_Processed, .MJX_Assistive_MathML { display: none !important; }
@@ -25,7 +25,7 @@
   --pre-bg:   var(--vscode-textBlockQuote-background, #232323);
   --tag-bg:   var(--vscode-badge-background, #2a2a2a);
   --tag-fg:   var(--vscode-badge-foreground, #bbb);
-  --rating:   #808080;
+  --rating:   #FF0000;
   --r:        6px;
 }
 
@@ -182,45 +182,48 @@ li { margin: 5px 0; }
 
 <!-- ── Header ── -->
 <div class="hdr">
-  <div class="contest-pill">Contest 363 &middot; Problem A</div>
-  <div class="prob-title">A. Soroban</div>
+  <div class="contest-pill">Contest 581 &middot; Problem E</div>
+  <div class="prob-title">E. Kojiro and Furrari</div>
 
   <div class="meta-row">
-    <span class="pill"><span>&#9201;</span><strong>1 second</strong></span>
+    <span class="pill"><span>&#9201;</span><strong>2 seconds</strong></span>
     <span class="pill"><span>&#128190;</span><strong>256 megabytes</strong></span>
-    <span class="pill pill-rating"><strong>800</strong><span style="opacity:.6;font-size:11px;margin-left:3px">Newbie</span></span>
+    <span class="pill pill-rating"><strong>2800</strong><span style="opacity:.6;font-size:11px;margin-left:3px">Grandmaster</span></span>
   </div>
 
   <!-- Tags (collapsed by default) -->
   <div class="detail">
     <button class="detail-btn" id="btn-tags">
       <span class="chev" id="chev-tags">&#9658;</span>
-      Tags <span style="opacity:.5;font-size:11px">(1)</span>
+      Tags <span style="opacity:.5;font-size:11px">(2)</span>
     </button>
     <div class="detail-body" id="tags">
-      <div class="tags"><span class="tag">implementation</span></div>
+      <div class="tags"><span class="tag">dp</span><span class="tag">greedy</span></div>
     </div>
   </div>
 </div>
 
 <!-- ── Statement ── -->
-<div class="section"><p>You know that Japan is the country with almost the largest 'electronic devices per person' ratio. So you might be quite surprised to find out that the primary school in Japan teaches to count using a <span class="tex-font-style-it">Soroban</span> — an abacus developed in Japan. This phenomenon has its reasons, of course, but we are not going to speak about them. Let's have a look at the Soroban's construction.</p>
-<img data-cf-image="363-A_c89d840feb7a00e1533b72e95915d7c6775a77b7_png.png" src="" alt="" loading="lazy">
-<p>Soroban consists of some number of rods, each rod contains five beads. We will assume that the rods are horizontal lines. One bead on each rod (the leftmost one) is divided from the others by a bar (the reckoning bar). This single bead is called <span class="tex-font-style-it">go-dama</span> and four others are <span class="tex-font-style-it">ichi-damas</span>. Each rod is responsible for representing a single digit from 0 to 9. We can obtain the value of a digit by following simple algorithm:</p>
-<ul><li>Set the value of a digit equal to 0.</li><li>If the go-dama is shifted to the right, add 5.</li><li>Add the number of ichi-damas shifted to the left.</li></ul>
-<p>Thus, the upper rod on the picture shows digit 0, the middle one shows digit 2 and the lower one shows 7. We will consider the top rod to represent the last decimal digit of a number, so the picture shows number 720.</p>
-<p>Write the program that prints the way Soroban shows the given number <span class="tex-span"><i>n</i></span>.</p></div>
+<div class="section"><p>Motorist Kojiro spent <span class="tex-span">10</span> years saving up for his favorite car brand, Furrari. Finally Kojiro's dream came true! Kojiro now wants to get to his girlfriend Johanna to show off his car to her.</p>
+<p>Kojiro wants to get to his girlfriend, so he will go to her along a coordinate line. For simplicity, we can assume that Kojiro is at the point <span class="tex-span"><i>f</i></span> of a coordinate line, and Johanna is at point <span class="tex-span"><i>e</i></span>. Some points of the coordinate line have gas stations. Every gas station fills with only one type of fuel: <span class="tex-font-style-it">Regular-92</span>, <span class="tex-font-style-it">Premium-95</span> or <span class="tex-font-style-it">Super-98</span>. Thus, each gas station is characterized by a pair of integers <span class="tex-span"><i>t</i><sub class="lower-index"><i>i</i></sub></span> and <span class="tex-span"><i>x</i><sub class="lower-index"><i>i</i></sub></span> — the number of the gas type and its position.</p>
+<p>One liter of fuel is enough to drive for exactly <span class="tex-span">1</span> km (this value does not depend on the type of fuel). Fuels of three types differ only in quality, according to the research, that affects the lifetime of the vehicle motor. A Furrari tank holds exactly <span class="tex-span"><i>s</i></span> liters of fuel (regardless of the type of fuel). At the moment of departure from point <span class="tex-span"><i>f</i></span> Kojiro's tank is completely filled with fuel <span class="tex-font-style-it">Super-98</span>. At each gas station Kojiro can fill the tank with any amount of fuel, but of course, at no point in time, the amount of fuel in the tank can be more than <span class="tex-span"><i>s</i></span> liters. Note that the tank <span class="tex-font-style-bf">can</span> simultaneously have different types of fuel. The car can moves both left and right.</p>
+<p>To extend the lifetime of the engine Kojiro seeks primarily to minimize the amount of fuel of type <span class="tex-font-style-it">Regular-92</span>. If there are several strategies to go from <span class="tex-span"><i>f</i></span> to <span class="tex-span"><i>e</i></span>, using the minimum amount of fuel of type <span class="tex-font-style-it">Regular-92</span>, it is necessary to travel so as to minimize the amount of used fuel of type <span class="tex-font-style-it">Premium-95</span>.</p>
+<p>Write a program that can for the <span class="tex-span"><i>m</i></span> possible positions of the start <span class="tex-span"><i>f</i><sub class="lower-index"><i>i</i></sub></span> minimize firstly, the amount of used fuel of type <span class="tex-font-style-it">Regular-92</span> and secondly, the amount of used fuel of type <span class="tex-font-style-it">Premium-95</span>.</p></div>
 
 <!-- ── Input ── -->
 <div class="section">
   <div class="sec-title">Input</div>
-  <p>The first line contains a single integer <span class="tex-span"><i>n</i></span> (<span class="tex-span">0 ≤ <i>n</i> &lt; 10<sup class="upper-index">9</sup></span>).</p>
+  <p>The first line of the input contains four positive integers <span class="tex-span"><i>e</i>, <i>s</i>, <i>n</i>, <i>m</i></span> (<span class="tex-span">1 ≤ <i>e</i>, <i>s</i> ≤ 10<sup class="upper-index">9</sup>, 1 ≤ <i>n</i>, <i>m</i> ≤ 2·10<sup class="upper-index">5</sup></span>) — the coordinate of the point where Johanna is, the capacity of a Furrari tank, the number of gas stations and the number of starting points.</p>
+<p>Next <span class="tex-span"><i>n</i></span> lines contain two integers each <span class="tex-span"><i>t</i><sub class="lower-index"><i>i</i></sub>, <i>x</i><sub class="lower-index"><i>i</i></sub></span> (<span class="tex-span">1 ≤ <i>t</i><sub class="lower-index"><i>i</i></sub> ≤ 3,  - 10<sup class="upper-index">9</sup> ≤ <i>x</i><sub class="lower-index"><i>i</i></sub> ≤ 10<sup class="upper-index">9</sup></span>), representing the type of the <span class="tex-span"><i>i</i></span>-th gas station (<span class="tex-span">1</span> represents <span class="tex-font-style-it">Regular-92</span>, <span class="tex-span">2</span> — <span class="tex-font-style-it">Premium-95</span> and <span class="tex-span">3</span> — <span class="tex-font-style-it">Super-98</span>) and the position on a coordinate line of the <span class="tex-span"><i>i</i></span>-th gas station. Gas stations don't necessarily follow in order from left to right.</p>
+<p>The last line contains <span class="tex-span"><i>m</i></span> integers <span class="tex-span"><i>f</i><sub class="lower-index"><i>i</i></sub></span> (<span class="tex-span"> - 10<sup class="upper-index">9</sup> ≤ <i>f</i><sub class="lower-index"><i>i</i></sub> &lt; <i>e</i></span>). Start positions don't necessarily follow in order from left to right.</p>
+<p>No point of the coordinate line contains more than one gas station. It is possible that some of points <span class="tex-span"><i>f</i><sub class="lower-index"><i>i</i></sub></span> or point <span class="tex-span"><i>e</i></span> coincide with a gas station.</p>
 </div>
 
 <!-- ── Output ── -->
 <div class="section">
   <div class="sec-title">Output</div>
-  <p>Print the description of the decimal digits of number <span class="tex-span"><i>n</i></span> <span class="tex-font-style-bf">from the last one to the first one (as mentioned on the picture in the statement)</span>, one per line. Print the beads as large English letters 'O', rod pieces as character '-' and the reckoning bar as '|'. Print as many rods, as many digits are in the decimal representation of number <span class="tex-span"><i>n</i></span> without leading zeroes. We can assume that number 0 has no leading zeroes.</p>
+  <p>Print exactly <span class="tex-span"><i>m</i></span> lines. The <span class="tex-span"><i>i</i></span>-th of them should contain two integers — the minimum amount of gas of type <span class="tex-font-style-it">Regular-92</span> and type <span class="tex-font-style-it">Premium-95</span>, if Kojiro starts at point <span class="tex-span"><i>f</i><sub class="lower-index"><i>i</i></sub></span>. First you need to minimize the first value. If there are multiple ways to do it, you need to also minimize the second value.</p>
+<p>If there is no way to get to Johanna from point <span class="tex-span"><i>f</i><sub class="lower-index"><i>i</i></sub></span>, the <span class="tex-span"><i>i</i></span>-th line should look like that "<span class="tex-font-style-tt">-1 -1</span>" (two numbers minus one without the quotes).</p>
 </div>
 
 <!-- ── Examples ── -->
@@ -234,16 +237,20 @@ li { margin: 5px 0; }
   <div class="io-block">
     <div class="io-bar">
       <span class="io-label">Input</span>
-      <button class="copy-btn" data-copy="2">Copy</button>
+      <button class="copy-btn" data-copy="8 4 1 1
+2 4
+0">Copy</button>
     </div>
-    <pre class="io-pre">2</pre>
+    <pre class="io-pre">8 4 1 1
+2 4
+0</pre>
   </div>
   <div class="io-block">
     <div class="io-bar">
       <span class="io-label">Output</span>
-      <button class="copy-btn" data-copy="O-|OO-OO">Copy</button>
+      <button class="copy-btn" data-copy="0 4">Copy</button>
     </div>
-    <pre class="io-pre">O-|OO-OO</pre>
+    <pre class="io-pre">0 4</pre>
   </div>
   
 </div>

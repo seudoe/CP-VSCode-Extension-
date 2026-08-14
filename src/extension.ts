@@ -66,7 +66,13 @@ const PROBLEM_CATEGORIES = [
 class ProblemCategoryItem extends vscode.TreeItem {
   constructor(public readonly category: string) {
     super(category, vscode.TreeItemCollapsibleState.Collapsed);
-    this.contextValue = category === 'All' ? 'problemCategoryAll' : 'problemCategory';
+    if (category === 'All') {
+      this.contextValue = 'problemCategoryAll';
+    } else if (category === 'Past Contests') {
+      this.contextValue = 'problemCategoryPast';
+    } else {
+      this.contextValue = 'problemCategory';
+    }
   }
 }
 
@@ -460,6 +466,75 @@ export function activate(context: vscode.ExtensionContext) {
         if (selected) {
           openProblemPanel(selected.problem, context);
           quickPick.hide();
+        }
+      });
+
+      quickPick.onDidHide(() => quickPick.dispose());
+      quickPick.show();
+    })
+  );
+
+  // Search Past Contests
+  context.subscriptions.push(
+    vscode.commands.registerCommand('seudoe.searchPastContests', () => {
+      const contestsDb = problemsProvider.getContests();
+      if (contestsDb.past.length === 0) {
+        vscode.window.showInformationMessage('Contests are still loading...');
+        return;
+      }
+
+      interface ContestQuickPickItem extends vscode.QuickPickItem {
+        contestEntry: ContestWithProblems;
+      }
+
+      const items: ContestQuickPickItem[] = contestsDb.past.map(entry => {
+        const idPad = String(entry.contest.id).padStart(4, '0');
+        return {
+          label: `${idPad} - ${entry.contest.name}`,
+          description: `${entry.problems.length} problems`,
+          contestEntry: entry,
+        };
+      });
+
+      const quickPick = vscode.window.createQuickPick<ContestQuickPickItem>();
+      quickPick.items = items;
+      quickPick.placeholder = 'Search Past Contests...';
+      quickPick.matchOnDescription = true;
+
+      quickPick.onDidAccept(() => {
+        const selected = quickPick.selectedItems[0];
+        if (selected) {
+          quickPick.hide();
+          
+          // Open a second quick pick for the problems in this contest
+          interface ProblemQuickPickItem extends vscode.QuickPickItem {
+            problem: CFProblem;
+          }
+          
+          const probItems: ProblemQuickPickItem[] = selected.contestEntry.problems.map(p => {
+            const id = p.contestId ? `${p.contestId}${p.index}` : p.index;
+            return {
+              label: `[${id}] ${p.name}`,
+              description: p.rating ? `★ ${p.rating}` : '★ ?',
+              detail: selected.contestEntry.contest.name,
+              problem: p,
+            };
+          });
+
+          const probQuickPick = vscode.window.createQuickPick<ProblemQuickPickItem>();
+          probQuickPick.items = probItems;
+          probQuickPick.placeholder = `Select a problem from ${selected.contestEntry.contest.name}`;
+          probQuickPick.matchOnDescription = true;
+          
+          probQuickPick.onDidAccept(() => {
+            const selectedProb = probQuickPick.selectedItems[0];
+            if (selectedProb) {
+              openProblemPanel(selectedProb.problem, context);
+              probQuickPick.hide();
+            }
+          });
+          probQuickPick.onDidHide(() => probQuickPick.dispose());
+          probQuickPick.show();
         }
       });
 
