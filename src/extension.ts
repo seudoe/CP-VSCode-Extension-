@@ -66,7 +66,7 @@ const PROBLEM_CATEGORIES = [
 class ProblemCategoryItem extends vscode.TreeItem {
   constructor(public readonly category: string) {
     super(category, vscode.TreeItemCollapsibleState.Collapsed);
-    this.contextValue = 'problemCategory';
+    this.contextValue = category === 'All' ? 'problemCategoryAll' : 'problemCategory';
   }
 }
 
@@ -167,6 +167,9 @@ class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     this.tagGroups = readTagDb();
     this.contestDb = readContestDb();
   }
+
+  getProblems(): CFProblem[] { return this.allProblems; }
+  getContests(): ContestDB { return this.contestDb; }
 
   /** Called after ensureDerivedDbs() resolves on startup */
   setContestDb(db: ContestDB): void {
@@ -413,6 +416,55 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('seudoe.helloWorld', () => {
       vscode.window.showInformationMessage('Hello World from codFrc!');
+    })
+  );
+
+  // Search Problems
+  context.subscriptions.push(
+    vscode.commands.registerCommand('seudoe.searchProblems', () => {
+      const allProblems = problemsProvider.getProblems();
+      const contestsDb = problemsProvider.getContests();
+
+      if (allProblems.length === 0) {
+        vscode.window.showInformationMessage('Problems are still loading...');
+        return;
+      }
+
+      const contestMap = new Map<number, string>();
+      for (const c of contestsDb.past) contestMap.set(c.contest.id, c.contest.name);
+      for (const c of contestsDb.upcoming) contestMap.set(c.contest.id, c.contest.name);
+
+      interface ProblemQuickPickItem extends vscode.QuickPickItem {
+        problem: CFProblem;
+      }
+
+      const items: ProblemQuickPickItem[] = allProblems.map(p => {
+        const id = p.contestId ? `${p.contestId}${p.index}` : p.index;
+        const contestName = p.contestId ? (contestMap.get(p.contestId) ?? `Contest ${p.contestId}`) : 'Unknown Contest';
+        return {
+          label: `[${id}] ${p.name}`,
+          description: p.rating ? `★ ${p.rating}` : '★ ?',
+          detail: contestName,
+          problem: p,
+        };
+      });
+
+      const quickPick = vscode.window.createQuickPick<ProblemQuickPickItem>();
+      quickPick.items = items;
+      quickPick.placeholder = 'Search Codeforces problems (e.g. 1543A, Two Sum, Div. 2...)';
+      quickPick.matchOnDescription = true;
+      quickPick.matchOnDetail = true;
+
+      quickPick.onDidAccept(() => {
+        const selected = quickPick.selectedItems[0];
+        if (selected) {
+          openProblemPanel(selected.problem, context);
+          quickPick.hide();
+        }
+      });
+
+      quickPick.onDidHide(() => quickPick.dispose());
+      quickPick.show();
     })
   );
 }

@@ -16,8 +16,22 @@
       {
         "command": "seudoe.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "seudoe.searchProblems",
+        "title": "Search Problems",
+        "icon": "$(search)"
       }
     ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "seudoe.searchProblems",
+          "when": "view == seudoe.problemsView && viewItem == problemCategoryAll",
+          "group": "inline"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
