@@ -4,7 +4,7 @@ import { readRatingDb, buildRatingDb, sortedRatingKeys, RatingGroup, RATING_RANK
 import { readTagDb, buildTagDb, sortedTagKeys, TagGroup, OTHER_TAG_KEY } from './problems/tag-db';
 import { readContestDb, ContestDB, ContestWithProblems } from './problems/contest-db';
 import { CFProblem } from './problems/cf-api';
-import { fetchProblem, fetchImage, closeDb } from './problems/db';
+import { fetchProblem, fetchImage, closeDb, reportProblemError } from './problems/db';
 import { renderProblem } from './problems/renderer';
 
 // ── CF rank color map ────────────────────────────────────────────────────────
@@ -338,24 +338,35 @@ async function openProblemPanel(
   // Show loading state while fetching from MongoDB
   currentPanel.webview.html = loadingHtml(id, problem.name);
 
-  // Handle image requests from the webview
-  const imageListener = currentPanel.webview.onDidReceiveMessage(async (msg) => {
-    if (msg.type !== 'fetchImage' || !currentPanel) { return; }
-    try {
-      const result = await fetchImage(msg.filename as string);
-      if (result && currentPanel) {
-        const base64 = result.buffer.toString('base64');
-        currentPanel.webview.postMessage({
-          type: 'imageData',
-          filename: msg.filename,
-          dataUri: `data:${result.contentType};base64,${base64}`,
-        });
+  // Handle messages from the webview
+  const messageListener = currentPanel.webview.onDidReceiveMessage(async (msg) => {
+    if (msg.type === 'fetchImage') {
+      try {
+        const result = await fetchImage(msg.filename as string);
+        if (result && currentPanel) {
+          const base64 = result.buffer.toString('base64');
+          currentPanel.webview.postMessage({
+            type: 'imageData',
+            filename: msg.filename,
+            dataUri: `data:${result.contentType};base64,${base64}`,
+          });
+        }
+      } catch (err) {
+        console.error(`[seudoe] Failed to load image ${msg.filename}:`, err);
       }
-    } catch (err) {
-      console.error(`[seudoe] Failed to load image ${msg.filename}:`, err);
+    } else if (msg.type === 'reportError') {
+      try {
+        await reportProblemError(problem.contestId!, problem.index);
+        vscode.window.showInformationMessage(`Reported problem ${problem.contestId}${problem.index} successfully!`);
+      } catch (err) {
+        vscode.window.showErrorMessage(`Failed to report problem: ${err}`);
+      }
+    } else if (msg.type === 'openBrowser') {
+      const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
+      vscode.env.openExternal(vscode.Uri.parse(url));
     }
   });
-  context.subscriptions.push(imageListener);
+  context.subscriptions.push(messageListener);
 
   // Fetch problem from MongoDB
   try {
@@ -364,7 +375,9 @@ async function openProblemPanel(
       if (currentPanel) {
         currentPanel.webview.html = errorHtml(
           id,
-          `Problem ${id} not found in database.\n\nRun the Python scraper first:\n  cd CF-scraper-python\n  python app.py\nthen POST /sync`
+          `Problem ${id} not found in database.\n\nServer or Database Error. The problem statement could not be fetched.`,
+          problem.contestId,
+          problem.index
         );
       }
       return;
@@ -375,7 +388,7 @@ async function openProblemPanel(
   } catch (err) {
     console.error(`[seudoe] MongoDB fetch failed for ${id}:`, err);
     if (currentPanel) {
-      currentPanel.webview.html = errorHtml(id, String(err));
+      currentPanel.webview.html = errorHtml(id, String(err), problem.contestId, problem.index);
     }
   }
 }
@@ -387,9 +400,13 @@ function loadingHtml(id: string, name: string): string {
   </body></html>`;
 }
 
-function errorHtml(id: string, msg: string): string {
+function errorHtml(id: string, msg: string, contestId?: number, index?: string): string {
+  const browserBtn = contestId && index
+    ? `<br><br><a href="https://codeforces.com/problemset/problem/${contestId}/${index}" style="color:#4e9eff;text-decoration:none;border:1px solid #4e9eff;padding:6px 12px;border-radius:4px;display:inline-block">See the problem statement in default browser</a>`
+    : '';
+
   return `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:32px;color:#f44">
-    <h2>Failed to load [${id}]</h2><pre>${msg}</pre>
+    <h2>Failed to load [${id}]</h2><pre>${msg}</pre>${browserBtn}
   </body></html>`;
 }
 

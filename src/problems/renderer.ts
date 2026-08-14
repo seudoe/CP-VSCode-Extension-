@@ -410,6 +410,7 @@ li { margin: 5px 0; }
 <div class="hdr">
   <div class="contest-pill">Contest ${contestId} &middot; Problem ${index}</div>
   <div class="prob-title">${esc(statement.title)}</div>
+  <button class="detail-btn" id="btn-browser-top" style="margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent); text-decoration: underline; cursor: pointer;">View in Browser</button>
 
   <div class="meta-row">
     <span class="pill"><span>&#9201;</span><strong>${esc(statement.timeLimit)}</strong></span>
@@ -456,6 +457,17 @@ ${noteHtml ? `
   ${noteHtml}
 </div>` : ''}
 
+<hr style="border: 0; height: 1px; background: var(--border); margin: 40px 0 20px;">
+<div class="section" style="padding-top: 0; margin-top: 0;">
+  <p style="font-size: 13px; color: var(--muted); margin-bottom: 10px;">
+    See any problem/error in the problem statement?
+  </p>
+  <div style="display: flex; gap: 10px;">
+    <button class="copy-btn" id="btn-report">Report Error</button>
+    <button class="copy-btn" id="btn-browser-bottom">View in Browser</button>
+  </div>
+</div>
+
 <script nonce="${nonce}">
   // ── Collapsible ────────────────────────────────────────────────────────────
   function tog(id) {
@@ -495,6 +507,16 @@ ${noteHtml ? `
       document.querySelectorAll('img[data-cf-image="'+m.filename+'"]')
         .forEach(i => i.src = m.dataUri);
   });
+
+  // ── Report & Browser Actions ───────────────────────────────────────────────
+  document.getElementById('btn-report')?.addEventListener('click', function() {
+    this.textContent = 'Reported!';
+    this.classList.add('ok');
+    vsApi.postMessage({ type: 'reportError' });
+  });
+  const openBrowser = () => vsApi.postMessage({ type: 'openBrowser' });
+  document.getElementById('btn-browser-top')?.addEventListener('click', openBrowser);
+  document.getElementById('btn-browser-bottom')?.addEventListener('click', openBrowser);
 </script>
 
 

@@ -130,3 +130,19 @@ export async function closeDb(): Promise<void> {
     console.log('[seudoe/db] MongoDB connection closed');
   }
 }
+
+/**
+ * Report a problem error to MongoDB.
+ */
+export async function reportProblemError(contestId: number, index: string): Promise<void> {
+  const db = await getDb();
+  const col = db.collection('reports');
+  const id = `${contestId}${index}`;
+
+  await col.updateOne(
+    { listed_for: 'report' },
+    { $addToSet: { ids: id } },
+    { upsert: true }
+  );
+  console.log(`[seudoe/db] Reported problem error for ${id}`);
+}
