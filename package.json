@@ -26,9 +26,21 @@
         "command": "seudoe.searchPastContests",
         "title": "Search Past Contests",
         "icon": "$(search)"
+      },
+      {
+        "command": "seudoe.setUserHandle",
+        "title": "Set Codeforces Handle",
+        "icon": "$(account)"
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "seudoe.setUserHandle",
+          "when": "view == seudoe.problemsView",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
         {
           "command": "seudoe.searchProblems",

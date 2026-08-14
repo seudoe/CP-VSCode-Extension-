@@ -6,6 +6,7 @@ import { readContestDb, ContestDB, ContestWithProblems } from './problems/contes
 import { CFProblem } from './problems/cf-api';
 import { fetchProblem, fetchImage, closeDb, reportProblemError } from './problems/db';
 import { renderProblem } from './problems/renderer';
+import { getUserDetails, saveUserDetails, fetchUserStatus, UserDetails, initUserDb } from './problems/user-db';
 
 // ── CF rank color map ────────────────────────────────────────────────────────
 // Source: https://gist.github.com/algon-320/4369c85b34cb4f76a7f843a5a803125b
@@ -119,10 +120,11 @@ class ContestItem extends vscode.TreeItem {
 }
 
 class ProblemItem extends vscode.TreeItem {
-  constructor(public readonly problem: CFProblem) {
+  constructor(public readonly problem: CFProblem, provider: ProblemsProvider) {
     const id = problem.contestId
       ? `${problem.contestId}${problem.index}`
       : problem.index;
+
     super(`[${id}] ${problem.name}`, vscode.TreeItemCollapsibleState.None);
     this.description = problem.rating ? `★ ${problem.rating}` : '';
     this.tooltip = problem.tags.length
@@ -135,6 +137,15 @@ class ProblemItem extends vscode.TreeItem {
       `${CF_RATING_SCHEME}://${encodeURIComponent(ratingKey)}`
     );
 
+    const userDetails = provider.getUserDetails();
+    const statusStr = userDetails?.problems[id];
+
+    if (statusStr) {
+      this.iconPath = generateStatusIcon(statusStr, provider.getExtensionUri());
+    } else {
+      this.iconPath = vscode.Uri.joinPath(provider.getExtensionUri(), 'media', 'empty.svg');
+    }
+
     // Fire the open command when clicked
     this.command = {
       command: 'seudoe.openProblem',
@@ -142,6 +153,29 @@ class ProblemItem extends vscode.TreeItem {
       arguments: [problem],
     };
   }
+}
+
+function generateStatusIcon(statusStr: string, extensionUri: vscode.Uri): vscode.Uri {
+  const isPositive = statusStr.startsWith('+');
+  const color = isPositive ? '#4fb56b' : '#f14c4c'; // Green or Red
+  
+  const fs = require('fs') as typeof import('fs');
+  const safeName = statusStr.replace('+', 'plus_').replace('-', 'minus_') + '.svg';
+  const folderPath = vscode.Uri.joinPath(extensionUri, 'media', 'status');
+  const filePath = vscode.Uri.joinPath(folderPath, safeName);
+  
+  if (!fs.existsSync(folderPath.fsPath)) {
+    fs.mkdirSync(folderPath.fsPath, { recursive: true });
+  }
+
+  if (!fs.existsSync(filePath.fsPath)) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="16" viewBox="0 0 24 16">
+      <text x="12" y="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="bold" fill="${color}" text-anchor="middle">${statusStr}</text>
+    </svg>`;
+    fs.writeFileSync(filePath.fsPath, svg, 'utf8');
+  }
+
+  return filePath;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -171,13 +205,23 @@ class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private ratingGroups: RatingGroup = {};
   private tagGroups: TagGroup = {};
   private contestDb: ContestDB = { past: [], upcoming: [] };
+  private userDetails: UserDetails | null = null;
 
-  constructor() {
+  constructor(private context: vscode.ExtensionContext) {
     const db = readDb();
     this.allProblems = db.problems;
     this.ratingGroups = readRatingDb();
     this.tagGroups = readTagDb();
     this.contestDb = readContestDb();
+    this.userDetails = getUserDetails();
+  }
+
+  getUserDetails() { return this.userDetails; }
+  getExtensionUri() { return this.context.extensionUri; }
+
+  setUserDetails(details: UserDetails) {
+    this.userDetails = details;
+    this._onDidChangeTreeData.fire();
   }
 
   getProblems(): CFProblem[] { return this.allProblems; }
@@ -218,7 +262,7 @@ class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         loading.description = 'Fetching from Codeforces API';
         return [loading];
       }
-      return this.allProblems.map(p => new ProblemItem(p));
+      return this.allProblems.map(p => new ProblemItem(p, this));
     }
 
     // Rating — sorted rating buckets
@@ -232,7 +276,7 @@ class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     // Rating bucket — problems inside it
     if (element instanceof RatingBucketItem) {
-      return (this.ratingGroups[element.ratingKey] ?? []).map(p => new ProblemItem(p));
+      return (this.ratingGroups[element.ratingKey] ?? []).map(p => new ProblemItem(p, this));
     }
 
     // Tag — sorted tag buckets
@@ -246,7 +290,7 @@ class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     // Tag bucket — problems inside it
     if (element instanceof TagBucketItem) {
-      return (this.tagGroups[element.tag] ?? []).map(p => new ProblemItem(p));
+      return (this.tagGroups[element.tag] ?? []).map(p => new ProblemItem(p, this));
     }
 
     // Past Contests
@@ -279,7 +323,7 @@ class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         }
         return [new vscode.TreeItem('No problems indexed')];
       }
-      return problems.map(p => new ProblemItem(p));
+      return problems.map(p => new ProblemItem(p, this));
     }
 
     // Other categories — coming soon
@@ -428,8 +472,9 @@ export function activate(context: vscode.ExtensionContext) {
   // Save DB files into extension's global storage path
   const dbStoragePath = context.extensionPath;
   initDb(dbStoragePath);
+  initUserDb(dbStoragePath);
 
-  const problemsProvider = new ProblemsProvider();
+  const problemsProvider = new ProblemsProvider(context);
   vscode.window.registerTreeDataProvider('seudoe.problemsView', problemsProvider);
   vscode.window.registerTreeDataProvider('seudoe.testCasesView', new TestCasesProvider());
 
@@ -441,6 +486,32 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('seudoe.openProblem', (problem: CFProblem) => {
       openProblemPanel(problem, context);
+    })
+  );
+
+  // Set user handle
+  context.subscriptions.push(
+    vscode.commands.registerCommand('seudoe.setUserHandle', async () => {
+      const handle = await vscode.window.showInputBox({
+        prompt: 'Enter your Codeforces handle to fetch submissions',
+        placeHolder: 'e.g. tourist'
+      });
+      if (!handle) return;
+
+      vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: `Fetching submissions for ${handle}...`,
+        cancellable: false
+      }, async () => {
+        try {
+          const details = await fetchUserStatus(handle);
+          saveUserDetails(details);
+          problemsProvider.setUserDetails(details);
+          vscode.window.showInformationMessage(`Successfully loaded submission status for ${handle}!`);
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Failed to load user: ${err.message}`);
+        }
+      });
     })
   );
 
