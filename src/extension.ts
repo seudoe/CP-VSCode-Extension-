@@ -475,7 +475,12 @@ export function activate(context: vscode.ExtensionContext) {
   initUserDb(dbStoragePath);
 
   const problemsProvider = new ProblemsProvider(context);
-  vscode.window.registerTreeDataProvider('seudoe.problemsView', problemsProvider);
+  const problemsTreeView = vscode.window.createTreeView('seudoe.problemsView', {
+    treeDataProvider: problemsProvider,
+    showCollapseAll: true
+  });
+  context.subscriptions.push(problemsTreeView);
+  
   vscode.window.registerTreeDataProvider('seudoe.testCasesView', new TestCasesProvider());
 
   context.subscriptions.push(
