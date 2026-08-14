@@ -307,6 +307,7 @@ class TestCasesProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
 // ── Webview panel manager ────────────────────────────────────────────────────
 
 let currentPanel: vscode.WebviewPanel | undefined;
+let currentMessageListener: vscode.Disposable | undefined;
 
 async function openProblemPanel(
   problem: CFProblem,
@@ -345,7 +346,11 @@ async function openProblemPanel(
   currentPanel.webview.html = loadingHtml(id, problem.name);
 
   // Handle messages from the webview
-  const messageListener = currentPanel.webview.onDidReceiveMessage(async (msg) => {
+  if (currentMessageListener) {
+    currentMessageListener.dispose();
+  }
+
+  currentMessageListener = currentPanel.webview.onDidReceiveMessage(async (msg) => {
     if (msg.type === 'fetchImage') {
       try {
         const result = await fetchImage(msg.filename as string);
@@ -372,7 +377,6 @@ async function openProblemPanel(
       vscode.env.openExternal(vscode.Uri.parse(url));
     }
   });
-  context.subscriptions.push(messageListener);
 
   // Fetch problem from MongoDB
   try {

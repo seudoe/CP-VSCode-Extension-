@@ -137,7 +137,39 @@ function blocksToHtml(blocks: Block[]): string {
 
 function renderExamples(examples: Example[]): string {
   if (!examples.length) { return '<p class="muted">No examples.</p>'; }
-  return examples.map((ex, i) => `
+  return examples.map((ex, i) => {
+    let inHtml = `<pre class="io-pre">${esc(ex.input)}</pre>`;
+    let outHtml = `<pre class="io-pre">${esc(ex.output)}</pre>`;
+
+    if (examples.length === 1) {
+      const inputLines = ex.input.trim().split('\n');
+      const outputLines = ex.output.trim().split('\n');
+      const t = parseInt(inputLines[0]?.trim(), 10);
+      
+      if (!isNaN(t) && t > 1 && t <= 100000) {
+        const remainingIn = inputLines.slice(1);
+        if (remainingIn.length % t === 0 && outputLines.length % t === 0) {
+          const inPerTest = remainingIn.length / t;
+          const outPerTest = outputLines.length / t;
+          
+          let fIn = `<div class="tc-row alt-0"><div class="tc-num"></div><div class="tc-content">${esc(inputLines[0])}</div></div>`;
+          for (let j = 0; j < t; j++) {
+            const chunk = remainingIn.slice(j * inPerTest, (j + 1) * inPerTest).join('\n');
+            fIn += `<div class="tc-row alt-${(j + 1) % 2}"><div class="tc-num">${j + 1}</div><div class="tc-content">${esc(chunk)}</div></div>`;
+          }
+          inHtml = `<div class="io-pre" style="padding:8px 0 12px;">${fIn}</div>`;
+          
+          let fOut = '';
+          for (let j = 0; j < t; j++) {
+            const chunk = outputLines.slice(j * outPerTest, (j + 1) * outPerTest).join('\n');
+            fOut += `<div class="tc-row alt-${(j + 1) % 2}"><div class="tc-num">${j + 1}</div><div class="tc-content">${esc(chunk)}</div></div>`;
+          }
+          outHtml = `<div class="io-pre" style="padding:8px 0 12px;">${fOut}</div>`;
+        }
+      }
+    }
+
+    return `
 <div class="example">
   <div class="example-head">
     <span class="example-label">Example ${i + 1}</span>
@@ -147,17 +179,18 @@ function renderExamples(examples: Example[]): string {
       <span class="io-label">Input</span>
       <button class="copy-btn" data-copy="${esc(ex.input)}">Copy</button>
     </div>
-    <pre class="io-pre">${esc(ex.input)}</pre>
+    ${inHtml}
   </div>
   <div class="io-block">
     <div class="io-bar">
       <span class="io-label">Output</span>
       <button class="copy-btn" data-copy="${esc(ex.output)}">Copy</button>
     </div>
-    <pre class="io-pre">${esc(ex.output)}</pre>
+    ${outHtml}
   </div>
   ${ex.explanation ? `<div class="example-note">${renderMathInText(ex.explanation)}</div>` : ''}
-</div>`).join('');
+</div>`;
+  }).join('');
 }
 
 // ── KaTeX CSS (inlined from the npm package) ──────────────────────────────────
@@ -377,6 +410,24 @@ li { margin: 5px 0; }
 .io-label {
   font-size: 11px; font-weight: 700; letter-spacing: .6px;
   text-transform: uppercase; color: var(--muted);
+}
+.tc-row {
+  display: flex; padding: 4px 14px;
+}
+.tc-row.alt-0 {
+  background: transparent;
+}
+.tc-row.alt-1 {
+  background: rgba(255, 255, 255, 0.04);
+}
+.tc-num {
+  width: 20px; flex-shrink: 0;
+  text-align: right; padding-right: 12px;
+  color: var(--muted); font-size: 10px;
+  user-select: none; line-height: 1.65;
+}
+.tc-content {
+  flex-grow: 1; white-space: pre;
 }
 .copy-btn {
   font: inherit; font-size: 11px;
