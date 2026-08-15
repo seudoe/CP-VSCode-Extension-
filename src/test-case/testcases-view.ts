@@ -44,7 +44,20 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
     const seudoeFilePath = path.join(seutestDir, `${basenameWithoutExt}.seudoe`);
 
     switch (message.type) {
-      case 'createProblem':
+      case 'createProblem': {
+        const ext = path.extname(docPath).toLowerCase();
+        const allowedExtensions = [
+          '.c', '.cpp', '.cxx', '.cc', '.cs', '.d', '.fs', '.go', '.hs', 
+          '.java', '.kt', '.ml', '.pas', '.dpr', '.php', '.py', '.rb', 
+          '.rs', '.scala', '.js', '.tcl', '.io', '.pike', '.bf', '.b', 
+          '.cob', '.cbl', '.factor', '.adb', '.ads', '.pi', '.qs', '.txt'
+        ];
+        
+        if (!allowedExtensions.includes(ext)) {
+          vscode.window.showErrorMessage(`Cannot create problem: File extension '${ext}' is not supported by Codeforces.`);
+          break;
+        }
+
         if (!fs.existsSync(seutestDir)) {
           fs.mkdirSync(seutestDir, { recursive: true });
         }
@@ -62,6 +75,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
         fs.writeFileSync(seudoeFilePath, JSON.stringify(boilerplate, null, 2), 'utf8');
         this.updateWebview(editor);
         break;
+      }
 
       case 'addTestCase':
         if (fs.existsSync(seudoeFilePath)) {
