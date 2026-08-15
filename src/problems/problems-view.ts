@@ -407,7 +407,7 @@ export async function openProblemPanel(
       const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
       vscode.env.openExternal(vscode.Uri.parse(url));
     } else if (msg.type === 'codeNow') {
-      const { getCodeNowSettings, resolveDirectory, generateFilename } = require('../settings/settings');
+      const { getCodeNowSettings, resolveDirectory, generateFilename, getBoilerplate } = require('../settings/settings');
       const settings = getCodeNowSettings();
       
       const exts = [
@@ -455,11 +455,10 @@ export async function openProblemPanel(
         
         try {
           if (!fs.existsSync(filePath.fsPath)) {
-            fs.writeFileSync(filePath.fsPath, '', 'utf8');
+            const boilerplateStr = getBoilerplate(selectedExt, rootPath, context.extensionUri.fsPath);
+            fs.writeFileSync(filePath.fsPath, boilerplateStr, 'utf8');
           }
           
-          const doc = await vscode.workspace.openTextDocument(filePath);
-          await vscode.window.showTextDocument(doc);
           
           // Generate .seudoe file for test cases
           const seutestDir = path.join(targetDir, '.seutest');
@@ -496,6 +495,9 @@ export async function openProblemPanel(
           };
 
           fs.writeFileSync(seudoeFilePath, JSON.stringify(boilerplate, null, 2), 'utf8');
+
+          const doc = await vscode.workspace.openTextDocument(filePath);
+          await vscode.window.showTextDocument(doc);
 
           // Open Test Cases Sidebar
           vscode.commands.executeCommand('seudoe.testCasesView.focus');

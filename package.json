@@ -104,6 +104,11 @@
           "type": "string",
           "default": "{problemId}-{problemName}{fileExtension}",
           "description": "Template for naming generated files. Available placeholders: {problemId}, {problemName}, {contestId}, {problemIndex}, {fileExtension}."
+        },
+        "seuCF.boilerplateCodes": {
+          "type": "object",
+          "default": {},
+          "description": "Custom boilerplate templates per language extension (e.g. \"cpp\"). Value can be an array of strings (lines of code) or a string starting with 'file:' (e.g. 'file:C:\\\\templates\\\\cpp.txt') to load from a file."
         }
       }
     }

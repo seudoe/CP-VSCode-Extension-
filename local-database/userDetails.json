@@ -1,18 +1,151 @@
 {
-  "name": "Local: 1019(2)1BeutifulArr",
-  "url": "c:\\ksdjfk\\sidhus\\codFrc\\1019(2)1BeutifulArr.cpp",
-  "tests": [
+  "handle": "seudoe",
+  "problems": {
+    "2148A": "+",
+    "2148B": "+",
+    "2148D": "+",
+    "2147A": "+",
+    "2149A": "+",
+    "2149B": "+",
+    "2149C": "+",
+    "2156A": "-1",
+    "2155A": "+",
+    "2167A": "+",
+    "2167B": "+",
+    "2178A": "+",
+    "2191A": "+",
+    "2185A": "+",
+    "2185B": "+",
+    "2233A": "+",
+    "2233B": "-5",
+    "2236A": "+",
+    "2236B": "+1",
+    "2237A": "+",
+    "2227A": "+",
+    "2227B": "+",
+    "2241A": "+",
+    "2241B": "-2",
+    "2244A": "+",
+    "2244B": "-1",
+    "4A": "-1",
+    "71A": "+",
+    "223B": "-1",
+    "231A": "+1",
+    "282A": "+",
+    "158A": "+3",
+    "1903A": "-1",
+    "2254A": "+",
+    "2254B": "-1",
+    "1901A": "+",
+    "1900A": "+1",
+    "1899A": "+"
+  },
+  "info": {
+    "country": "India",
+    "lastOnlineTimeSeconds": 1786422502,
+    "city": "Mumbai",
+    "rating": 769,
+    "friendOfCount": 6,
+    "titlePhoto": "https://userpic.codeforces.org/no-title.jpg",
+    "handle": "seudoe",
+    "avatar": "https://userpic.codeforces.org/no-avatar.jpg",
+    "contribution": 0,
+    "organization": "Dwarkadas J. Sanghvi College of Engineering",
+    "rank": "newbie",
+    "maxRating": 946,
+    "registrationTimeSeconds": 1757258817,
+    "maxRank": "newbie"
+  },
+  "rating": [
     {
-      "id": 1745248657533,
-      "input": "3\n3\n1 2 3\n5\n3 1 4 1 5\n1\n1\n",
-      "answer" : "",
-      "output": ""
+      "contestId": 2148,
+      "contestName": "Codeforces Round 1050 (Div. 4)",
+      "handle": "seudoe",
+      "rank": 12139,
+      "ratingUpdateTimeSeconds": 1757782200,
+      "oldRating": 0,
+      "newRating": 402
+    },
+    {
+      "contestId": 2147,
+      "contestName": "Codeforces Global Round 29 (Div. 1 + Div. 2)",
+      "handle": "seudoe",
+      "rank": 10189,
+      "ratingUpdateTimeSeconds": 1758389700,
+      "oldRating": 402,
+      "newRating": 659
+    },
+    {
+      "contestId": 2149,
+      "contestName": "Codeforces Round 1054 (Div. 3)",
+      "handle": "seudoe",
+      "rank": 11495,
+      "ratingUpdateTimeSeconds": 1758819000,
+      "oldRating": 659,
+      "newRating": 845
+    },
+    {
+      "contestId": 2191,
+      "contestName": "Codeforces Round 1073 (Div. 2)",
+      "handle": "seudoe",
+      "rank": 13563,
+      "ratingUpdateTimeSeconds": 1768671300,
+      "oldRating": 845,
+      "newRating": 913
+    },
+    {
+      "contestId": 2185,
+      "contestName": "Codeforces Round 1074 (Div. 4)",
+      "handle": "seudoe",
+      "rank": 17697,
+      "ratingUpdateTimeSeconds": 1768755000,
+      "oldRating": 913,
+      "newRating": 946
+    },
+    {
+      "contestId": 2236,
+      "contestName": "Codeforces Round 1103 (Div. 3)",
+      "handle": "seudoe",
+      "rank": 20104,
+      "ratingUpdateTimeSeconds": 1781283900,
+      "oldRating": 946,
+      "newRating": 902
+    },
+    {
+      "contestId": 2237,
+      "contestName": "Order Capital Round 2 (Codeforces Round 1104, Div. 1 + Div. 2)",
+      "handle": "seudoe",
+      "rank": 12022,
+      "ratingUpdateTimeSeconds": 1781804100,
+      "oldRating": 902,
+      "newRating": 868
+    },
+    {
+      "contestId": 2241,
+      "contestName": "Codeforces Round 1107 (Div. 3)",
+      "handle": "seudoe",
+      "rank": 17468,
+      "ratingUpdateTimeSeconds": 1782838200,
+      "oldRating": 868,
+      "newRating": 824
+    },
+    {
+      "contestId": 2244,
+      "contestName": "Codeforces Round 1109 (Div. 3)",
+      "handle": "seudoe",
+      "rank": 17398,
+      "ratingUpdateTimeSeconds": 1784047800,
+      "oldRating": 824,
+      "newRating": 786
+    },
+    {
+      "contestId": 2254,
+      "contestName": "Codeforces Round 1114 (Div. 3)",
+      "handle": "seudoe",
+      "rank": 18277,
+      "ratingUpdateTimeSeconds": 1785862200,
+      "oldRating": 786,
+      "newRating": 769
     }
-  ],
-  "interactive": false,
-  "memoryLimit": 1024,
-  "timeLimit": 3000,
-  "srcPath": "c:\\ksdjfk\\sidhus\\codFrc\\1019(2)1BeutifulArr.cpp",
-  "group": "local",
-  "local": true
+  ]
 }

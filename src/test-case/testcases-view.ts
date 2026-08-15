@@ -223,7 +223,9 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForTestCases(data: any): string {
-    const testsHtml = (data.tests || []).map((t: any, i: number) => `
+    const testsHtml = (data.tests || []).map((t: any, i: number) => {
+      const getRows = (text: string) => Math.min(25, Math.max(2, (text || '').split('\n').length));
+      return `
       <div class="test-case" data-index="${i}">
         <div class="tc-header">
           <span>TC ${i + 1}</span>
@@ -234,16 +236,17 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
         </div>
         <div class="tc-body">
           <label>Input:</label>
-          <textarea class="tc-input">${t.input || ''}</textarea>
+          <textarea class="tc-input" rows="${getRows(t.input)}">${t.input || ''}</textarea>
           <label>Expected Output:</label>
-          <textarea class="tc-answer">${t.answer || ''}</textarea>
+          <textarea class="tc-answer" rows="${getRows(t.answer)}">${t.answer || ''}</textarea>
           ${t.output ? `
           <label>Output:</label>
-          <textarea class="tc-output" readonly>${t.output}</textarea>
+          <textarea class="tc-output" readonly rows="${getRows(t.output)}">${t.output}</textarea>
           ` : ''}
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -326,7 +329,6 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
     textarea {
       width: 100%;
       box-sizing: border-box;
-      min-height: 60px;
       background-color: rgba(0, 0, 0, 0.2);
       color: var(--vscode-editor-foreground);
       border: 1px solid var(--vscode-input-border);
