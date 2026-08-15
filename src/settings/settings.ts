@@ -78,15 +78,24 @@ export function getBoilerplate(extension: string, workspaceRoot: string, extensi
     } else if (typeof val === 'string' && val.startsWith('file:')) {
       const filePath = val.substring(5).trim(); // strip "file:"
       const resolvedPath = resolveDirectory(filePath, workspaceRoot);
+      const providedExt = path.extname(filePath).toLowerCase();
+      const expectedExt = '.' + ext.toLowerCase();
+
+      let warningMsg = '';
+      if (providedExt !== expectedExt && providedExt !== '') {
+        warningMsg = `// Warning: The file extension expected for this file is ${expectedExt} but the provided boilerplate file is ${path.basename(filePath)} which is of extension ${providedExt}\n`;
+      }
+
       if (fs.existsSync(resolvedPath)) {
         try {
-          return fs.readFileSync(resolvedPath, 'utf8');
+          const content = fs.readFileSync(resolvedPath, 'utf8');
+          return warningMsg ? (warningMsg + '\n' + content) : content;
         } catch (err) {
           console.error(`[seudoe] Failed to read boilerplate file: ${resolvedPath}`, err);
-          errorPrefix = `// Error reading boilerplate file: ${err}\n// so loaded the default boilerplate\n\n`;
+          errorPrefix = warningMsg + `// Error reading boilerplate file: ${err}\n// so loaded the default boilerplate\n\n`;
         }
       } else {
-        errorPrefix = `// Error: Custom boilerplate file not found at ${resolvedPath}\n// so loaded the default boilerplate\n\n`;
+        errorPrefix = warningMsg + `// Error: Custom boilerplate file not found at ${resolvedPath}\n// so loaded the default boilerplate\n\n`;
       }
     } else if (typeof val === 'string') {
       return val;
