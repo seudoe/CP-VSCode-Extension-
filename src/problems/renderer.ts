@@ -558,17 +558,22 @@ ${noteHtml ? `
     const fn = img.getAttribute('data-cf-image');
     if (fn) vsApi.postMessage({ type: 'fetchImage', filename: fn });
   });
+  const btnReport = document.getElementById('btn-report');
   window.addEventListener('message', ev => {
     const m = ev.data;
-    if (m.type === 'imageData')
+    if (m.type === 'imageData') {
       document.querySelectorAll('img[data-cf-image="'+m.filename+'"]')
         .forEach(i => i.src = m.dataUri);
+    } else if (m.type === 'reportSuccess') {
+      if (btnReport) {
+        btnReport.textContent = 'Reported!';
+        btnReport.classList.add('ok');
+      }
+    }
   });
 
   // ── Report & Browser Actions ───────────────────────────────────────────────
-  document.getElementById('btn-report')?.addEventListener('click', function() {
-    this.textContent = 'Reported!';
-    this.classList.add('ok');
+  btnReport?.addEventListener('click', function() {
     vsApi.postMessage({ type: 'reportError' });
   });
   const openBrowser = () => vsApi.postMessage({ type: 'openBrowser' });

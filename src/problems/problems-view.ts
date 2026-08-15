@@ -398,8 +398,36 @@ export async function openProblemPanel(
       }
     } else if (msg.type === 'reportError') {
       try {
-        await reportProblemError(problem.contestId!, problem.index);
+        const options = [
+          'rendering errors',
+          'wrong input / output',
+          'wrong PS data',
+          'PS data missing',
+          'other'
+        ];
+        const reason = await vscode.window.showQuickPick(options, {
+          placeHolder: 'Select a reason for reporting this problem',
+        });
+
+        if (!reason) {
+          return; // User cancelled
+        }
+
+        let customReason: string | undefined = undefined;
+        if (reason === 'other') {
+          customReason = await vscode.window.showInputBox({
+            prompt: 'Please specify the reason',
+            placeHolder: 'E.g., missing image for example 2',
+          });
+          if (!customReason) {
+            return; // User cancelled
+          }
+        }
+
+        await reportProblemError(problem.contestId!, problem.index, reason, customReason);
         vscode.window.showInformationMessage(`Reported problem ${problem.contestId}${problem.index} successfully!`);
+        
+        currentPanel?.webview.postMessage({ type: 'reportSuccess' });
       } catch (err) {
         vscode.window.showErrorMessage(`Failed to report problem: ${err}`);
       }

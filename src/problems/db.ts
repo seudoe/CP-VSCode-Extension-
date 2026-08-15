@@ -134,15 +134,24 @@ export async function closeDb(): Promise<void> {
 /**
  * Report a problem error to MongoDB.
  */
-export async function reportProblemError(contestId: number, index: string): Promise<void> {
+export async function reportProblemError(contestId: number, index: string, reason: string, customReason?: string): Promise<void> {
   const db = await getDb();
   const col = db.collection('reports');
   const id = `${contestId}${index}`;
 
-  await col.updateOne(
-    { listed_for: 'report' },
-    { $addToSet: { ids: id } },
-    { upsert: true }
-  );
-  console.log(`[seudoe/db] Reported problem error for ${id}`);
+  if (reason.toLowerCase() === 'other' && customReason) {
+    await col.updateOne(
+      { report_reason: reason },
+      { $addToSet: { ids: { id, reason: customReason } } },
+      { upsert: true }
+    );
+  } else {
+    await col.updateOne(
+      { report_reason: reason },
+      { $addToSet: { ids: id } },
+      { upsert: true }
+    );
+  }
+  
+  console.log(`[seudoe/db] Reported problem error for ${id} with reason: ${reason}`);
 }
