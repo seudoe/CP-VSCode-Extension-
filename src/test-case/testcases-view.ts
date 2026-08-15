@@ -662,11 +662,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
         const targetSelector = btn.getAttribute('data-target');
         const textarea = btn.closest('.tc-body').querySelector(targetSelector);
         if (textarea) {
-          navigator.clipboard.writeText(textarea.value).then(() => {
-            const originalText = btn.innerText;
-            btn.innerText = '✓';
-            setTimeout(() => btn.innerText = originalText, 1500);
-          });
+          navigator.clipboard.writeText(textarea.value);
         }
       });
     });

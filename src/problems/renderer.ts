@@ -294,11 +294,11 @@ script-src 'nonce-${nonce}';">
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 15px;
-  line-height: 1.8;
+  font-size: 16px;
+  line-height: 1.7;
   color: var(--fg);
   background: var(--bg);
-  padding: 0 28px 72px;
+  padding: 0 32px 80px;
   max-width: 860px;
   margin: 0 auto;
 }
@@ -431,14 +431,15 @@ li { margin: 5px 0; }
   flex-grow: 1; white-space: pre;
 }
 .copy-btn {
-  font: inherit; font-size: 11px;
-  background: var(--tag-bg); color: var(--muted);
-  border: 1px solid var(--border); border-radius: 4px;
-  padding: 2px 8px; cursor: pointer;
-  transition: color .12s, border-color .12s;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  background: rgba(78, 158, 255, 0.1); color: var(--accent);
+  border: 1px solid rgba(78, 158, 255, 0.3); border-radius: 6px;
+  padding: 5px 12px; cursor: pointer;
+  transition: all 0.2s ease;
 }
-.copy-btn:hover { color: var(--fg); border-color: var(--accent); }
-.copy-btn.ok { color: #4caf50; border-color: #4caf50; }
+.copy-btn:hover { background: rgba(78, 158, 255, 0.2); border-color: var(--accent); transform: translateY(-1px); }
+.copy-btn:active { transform: translateY(0); }
+.copy-btn.ok { background: rgba(76, 175, 80, 0.1); color: #4caf50; border-color: #4caf50; }
 
 /* io-pre: MUST have white-space:pre to show newlines */
 .io-pre {
@@ -468,7 +469,7 @@ li { margin: 5px 0; }
     <span class="pill"><span>&#9201;</span><strong>${esc(statement.timeLimit)}</strong></span>
     <span class="pill"><span>&#128190;</span><strong>${esc(statement.memoryLimit)}</strong></span>
     ${meta?.rating ? `<span class="pill pill-rating"><strong>${meta.rating}</strong><span style="opacity:.6;font-size:11px;margin-left:3px">${label}</span></span>` : ''}
-    <button class="copy-btn" id="btn-code-now-top" style="background: var(--accent); color: #fff; font-weight: bold; border: none; padding: 4px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; margin-left: auto;">Code Now</button>
+    <button class="copy-btn" id="btn-code-now-top" style="background: var(--accent); color: #fff; font-weight: bold; border: none; padding: 6px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; margin-left: auto; box-shadow: 0 2px 8px rgba(78, 158, 255, 0.3);">Code Now</button>
   </div>
 
   <!-- Tags (collapsed by default) -->
@@ -544,9 +545,6 @@ ${noteHtml ? `
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    btn.textContent = 'Copied!';
-    btn.classList.add('ok');
-    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1500);
   }
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', () => doCopy(btn, btn.getAttribute('data-copy')));
@@ -583,7 +581,6 @@ ${noteHtml ? `
   // ── Code Now ───────────────────────────────────────────────────────────────
   const doCodeNow = () => vsApi.postMessage({ type: 'codeNow' });
   document.getElementById('btn-code-now-top')?.addEventListener('click', doCodeNow);
-  document.getElementById('btn-code-now-bottom')?.addEventListener('click', doCodeNow);
 </script>
 
 
