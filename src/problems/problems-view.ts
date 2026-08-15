@@ -460,8 +460,48 @@ export async function openProblemPanel(
           
           const doc = await vscode.workspace.openTextDocument(filePath);
           await vscode.window.showTextDocument(doc);
+          
+          // Generate .seudoe file for test cases
+          const seutestDir = path.join(targetDir, '.seutest');
+          const basenameWithoutExt = path.basename(filePath.fsPath, path.extname(filePath.fsPath));
+          const seudoeFilePath = path.join(seutestDir, `${basenameWithoutExt}.seudoe`);
+
+          if (!fs.existsSync(seutestDir)) {
+            fs.mkdirSync(seutestDir, { recursive: true });
+          }
+
+          // Try to get cached problem to extract examples
+          const cached = await fetchProblem(problem.contestId!, problem.index);
+          let testsArray: any[] = [];
+          
+          if (cached && cached.statement && cached.statement.examples) {
+            testsArray = cached.statement.examples.map((ex: any, i: number) => ({
+              id: Date.now() + i,
+              input: ex.input || '',
+              output: '',
+              answer: ex.output || ''
+            }));
+          }
+
+          const boilerplate = {
+            name: `${problem.contestId}${problem.index} - ${problem.name}`,
+            url: `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`,
+            tests: testsArray,
+            interactive: false,
+            memoryLimit: cached?.statement?.memoryLimit ? parseInt(cached.statement.memoryLimit as any) : 1024,
+            timeLimit: cached?.statement?.timeLimit ? parseInt(cached.statement.timeLimit as any) * 1000 : 3000,
+            srcPath: filePath.fsPath,
+            group: 'local',
+            local: true
+          };
+
+          fs.writeFileSync(seudoeFilePath, JSON.stringify(boilerplate, null, 2), 'utf8');
+
+          // Open Test Cases Sidebar
+          vscode.commands.executeCommand('seudoe.testCasesView.focus');
+          
         } catch (err) {
-          vscode.window.showErrorMessage(`Failed to create file: ${err}`);
+          vscode.window.showErrorMessage(`Failed to create file or testcases: ${err}`);
         }
       }
     }
@@ -505,6 +545,14 @@ function errorHtml(id: string, msg: string, contestId?: number, index?: string):
     : '';
 
   return `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:32px;color:#f44">
-    <h2>Failed to load [${id}]</h2><pre>${msg}</pre>${browserBtn}
+    <h2>Failed to load [${id}]</h2><pre>${msg}</pre>
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      ${browserBtn}
+      <button id="btn-code-now-error" style="background: linear-gradient(135deg, #007acc, #005a9e); color: #fff; border: none; padding: 6px 12px; font-weight: bold; cursor: pointer; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,122,204,0.3);">Code Now</button>
+    </div>
+    <script>
+      const vsApi = acquireVsCodeApi();
+      document.getElementById('btn-code-now-error')?.addEventListener('click', () => vsApi.postMessage({ type: 'codeNow' }));
+    </script>
   </body></html>`;
 }
