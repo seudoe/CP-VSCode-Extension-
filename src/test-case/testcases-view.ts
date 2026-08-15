@@ -20,6 +20,10 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       localResourceRoots: [this._extensionUri]
     };
 
+    webviewView.webview.onDidReceiveMessage(message => {
+      this.handleMessage(message);
+    });
+
     // Initially update based on current active editor
     this.updateWebview(vscode.window.activeTextEditor);
     
@@ -27,6 +31,70 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       this.updateWebview(editor);
     });
+  }
+
+  private handleMessage(message: any) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+
+    const docPath = editor.document.uri.fsPath;
+    const dir = path.dirname(docPath);
+    const basenameWithoutExt = path.basename(docPath, path.extname(docPath));
+    const seutestDir = path.join(dir, '.seutest');
+    const seudoeFilePath = path.join(seutestDir, `${basenameWithoutExt}.seudoe`);
+
+    switch (message.type) {
+      case 'createProblem':
+        if (!fs.existsSync(seutestDir)) {
+          fs.mkdirSync(seutestDir, { recursive: true });
+        }
+        const boilerplate = {
+          name: `Local: ${basenameWithoutExt}`,
+          url: docPath,
+          tests: [],
+          interactive: false,
+          memoryLimit: 1024,
+          timeLimit: 3000,
+          srcPath: docPath,
+          group: 'local',
+          local: true
+        };
+        fs.writeFileSync(seudoeFilePath, JSON.stringify(boilerplate, null, 2), 'utf8');
+        this.updateWebview(editor);
+        break;
+
+      case 'addTestCase':
+        if (fs.existsSync(seudoeFilePath)) {
+          try {
+            const data = JSON.parse(fs.readFileSync(seudoeFilePath, 'utf8'));
+            data.tests = data.tests || [];
+            data.tests.push({
+              id: Date.now(),
+              input: '',
+              output: '',
+              answer: ''
+            });
+            fs.writeFileSync(seudoeFilePath, JSON.stringify(data, null, 2), 'utf8');
+            this.updateWebview(editor);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        break;
+
+      case 'updateTestCase':
+        if (fs.existsSync(seudoeFilePath)) {
+          try {
+            const data = JSON.parse(fs.readFileSync(seudoeFilePath, 'utf8'));
+            data.tests = message.tests;
+            fs.writeFileSync(seudoeFilePath, JSON.stringify(data, null, 2), 'utf8');
+            // Deliberately NOT calling updateWebview here so we don't steal focus from the textarea
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        break;
+    }
   }
 
   private updateWebview(editor: vscode.TextEditor | undefined) {
@@ -68,49 +136,81 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <style>
     body {
-      font-family: var(--vscode-font-family);
+      font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
       color: var(--vscode-editor-foreground);
-      padding: 10px;
+      background: var(--vscode-editor-background);
+      padding: 20px;
       text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 90vh;
+      box-sizing: border-box;
+    }
+    p {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--vscode-descriptionForeground);
+      margin-bottom: 24px;
+      max-width: 250px;
     }
     .btn {
+      background: linear-gradient(135deg, var(--vscode-button-background), #005999);
       background-color: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
       border: none;
-      padding: 6px 12px;
-      margin: 4px;
+      border-radius: 6px;
+      padding: 10px 16px;
+      margin: 6px 0;
       cursor: pointer;
       width: 100%;
+      max-width: 200px;
+      font-weight: 600;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
       box-sizing: border-box;
     }
     .btn:hover {
       background-color: var(--vscode-button-hoverBackground);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
     .btn-secondary {
-      background-color: var(--vscode-button-secondaryBackground);
+      background: transparent;
       color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-button-secondaryBackground);
+      box-shadow: none;
     }
     .btn-secondary:hover {
-      background-color: var(--vscode-button-secondaryHoverBackground);
+      background: var(--vscode-button-secondaryHoverBackground);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
   </style>
 </head>
 <body>
   <p>This document does not have a CPH problem associated with it.</p>
-  <button class="btn">+ Create Problem</button>
+  <button class="btn" id="create-btn">+ Create Problem</button>
   <button class="btn btn-secondary">? How to use this extension</button>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    document.getElementById('create-btn').addEventListener('click', () => {
+      vscode.postMessage({ type: 'createProblem' });
+    });
+  </script>
 </body>
 </html>`;
   }
 
   private getHtmlForTestCases(data: any): string {
     const testsHtml = (data.tests || []).map((t: any, i: number) => `
-      <div class="test-case">
+      <div class="test-case" data-index="${i}">
         <div class="tc-header">
           <span>TC ${i + 1}</span>
           <div class="tc-actions">
@@ -120,9 +220,13 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
         </div>
         <div class="tc-body">
           <label>Input:</label>
-          <textarea readonly>${t.input || ''}</textarea>
+          <textarea class="tc-input">${t.input || ''}</textarea>
           <label>Expected Output:</label>
-          <textarea readonly>${t.output || ''}</textarea>
+          <textarea class="tc-answer">${t.answer || ''}</textarea>
+          ${t.output ? `
+          <label>Output:</label>
+          <textarea class="tc-output" readonly>${t.output}</textarea>
+          ` : ''}
         </div>
       </div>
     `).join('');
@@ -133,76 +237,154 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <style>
     body {
-      font-family: var(--vscode-font-family);
+      font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
       color: var(--vscode-editor-foreground);
+      background: var(--vscode-editor-background);
       padding: 0;
       margin: 0;
     }
     .header {
-      padding: 8px;
+      padding: 12px 16px;
+      background: var(--vscode-sideBarSectionHeader-background);
       border-bottom: 1px solid var(--vscode-panel-border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 12px;
-      font-weight: bold;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     .test-case {
-      border-bottom: 1px solid var(--vscode-panel-border);
+      margin: 12px;
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid var(--vscode-widget-border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      transition: border-color 0.2s ease;
+    }
+    .test-case:hover {
+      border-color: var(--vscode-focusBorder);
     }
     .tc-header {
-      padding: 8px;
+      padding: 10px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid var(--vscode-panel-border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: var(--vscode-textLink-foreground);
-      font-weight: bold;
-      cursor: pointer;
+      color: var(--vscode-editor-foreground);
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .tc-actions {
+      display: flex;
+      gap: 6px;
     }
     .tc-actions .icon-btn {
-      background: none;
+      background: transparent;
       border: none;
-      color: inherit;
+      color: var(--vscode-icon-foreground);
       cursor: pointer;
-      padding: 2px 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .tc-actions .play { background: #4fb56b; color: #fff; }
-    .tc-actions .delete { background: #f14c4c; color: #fff; }
+    .tc-actions .play:hover { background: rgba(79, 181, 107, 0.2); color: #4fb56b; }
+    .tc-actions .delete:hover { background: rgba(241, 76, 76, 0.2); color: #f14c4c; }
     .tc-body {
-      padding: 8px;
+      padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 8px;
+    }
+    label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--vscode-descriptionForeground);
+      font-weight: 600;
     }
     textarea {
       width: 100%;
       box-sizing: border-box;
       min-height: 60px;
-      background: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
+      background-color: rgba(0, 0, 0, 0.2);
+      color: var(--vscode-editor-foreground);
       border: 1px solid var(--vscode-input-border);
-      font-family: var(--vscode-editor-font-family);
+      border-radius: 4px;
+      padding: 8px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 13px;
+      line-height: 1.4;
       resize: vertical;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: var(--vscode-focusBorder);
+      box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+    }
+    textarea[readonly] {
+      background-color: rgba(0, 0, 0, 0.4);
+      opacity: 0.8;
+      cursor: not-allowed;
+    }
+    .actions-container {
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .actions-row {
+      display: flex;
+      gap: 10px;
     }
     .btn {
-      background-color: var(--vscode-button-background);
+      background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
       border: none;
-      padding: 6px 12px;
-      margin: 8px;
+      border-radius: 6px;
+      padding: 10px;
       cursor: pointer;
-      width: calc(100% - 16px);
-      box-sizing: border-box;
-      font-weight: bold;
+      flex: 1;
+      font-weight: 600;
+      font-size: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
-    .btn:hover { background-color: var(--vscode-button-hoverBackground); }
-    .btn-green { background-color: #4fb56b; }
-    .btn-blue { background-color: #007acc; }
+    .btn:hover {
+      background: var(--vscode-button-hoverBackground);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+    .btn-green {
+      background: linear-gradient(135deg, #4fb56b, #3b9152);
+      color: #fff;
+    }
+    .btn-green:hover { background: linear-gradient(135deg, #59c578, #44a55d); }
+    .btn-blue {
+      background: linear-gradient(135deg, #007acc, #005a9e);
+      color: #fff;
+    }
+    .btn-blue:hover { background: linear-gradient(135deg, #0088e5, #006bbd); }
   </style>
 </head>
 <body>
   <div class="header">
-    <span>Local: ${data.name || 'Unknown'}</span>
+    <span>${data.name || 'Unknown'}</span>
     <span style="color: #aaa">0 / ${data.tests?.length || 0} passed</span>
   </div>
   
@@ -210,12 +392,38 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
     ${testsHtml}
   </div>
 
-  <button class="btn btn-green">+ New Testcase</button>
-  <button class="btn btn-blue">Custom Checker</button>
-  
-  <div style="display:flex; padding: 0 8px;">
-    <button class="btn btn-blue" style="margin: 4px;">Run All</button>
+  <div class="actions-container">
+    <div class="actions-row">
+      <button class="btn btn-green" id="new-testcase-btn">+ New Testcase</button>
+      <button class="btn btn-blue">Custom Checker</button>
+    </div>
+    <button class="btn btn-blue" style="width: 100%;">Run All</button>
   </div>
+
+  <script>
+    const vscode = acquireVsCodeApi();
+    
+    let tests = ${JSON.stringify(data.tests || [])};
+
+    document.getElementById('new-testcase-btn').addEventListener('click', () => {
+      vscode.postMessage({ type: 'addTestCase' });
+    });
+
+    const testCaseDivs = document.querySelectorAll('.test-case');
+    testCaseDivs.forEach((div, index) => {
+      const inputEl = div.querySelector('.tc-input');
+      const answerEl = div.querySelector('.tc-answer');
+
+      const save = () => {
+        if (inputEl) tests[index].input = inputEl.value;
+        if (answerEl) tests[index].answer = answerEl.value;
+        vscode.postMessage({ type: 'updateTestCase', tests });
+      };
+
+      if (inputEl) inputEl.addEventListener('input', save);
+      if (answerEl) answerEl.addEventListener('input', save);
+    });
+  </script>
 </body>
 </html>`;
   }
