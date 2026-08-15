@@ -82,6 +82,30 @@
           "name": "Test Cases"
         }
       ]
+    },
+    "configuration": {
+      "title": "Competitive Programming",
+      "properties": {
+        "seuCF.fileCreationDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Directory where 'Code Now' creates files. If it starts with a disk letter (e.g., C:\\) or a forward slash (/), it is treated as an absolute path. Otherwise, it is treated as relative to the current workspace root. Leave empty to use the workspace root."
+        },
+        "seuCF.defaultFileExtension": {
+          "type": "string",
+          "default": "Select everytime",
+          "enum": [
+            "Select everytime",
+            ".cpp", ".py", ".java", ".c", ".cs", ".go", ".hs", ".kt", ".php", ".rb", ".rs", ".js"
+          ],
+          "description": "Default file extension used for the 'Code Now' button. Set to 'Select everytime' to manually choose the language on each click."
+        },
+        "seuCF.fileName": {
+          "type": "string",
+          "default": "{problemId}-{problemName}{fileExtension}",
+          "description": "Template for naming generated files. Available placeholders: {problemId}, {problemName}, {contestId}, {problemIndex}, {fileExtension}."
+        }
+      }
     }
   },
   "scripts": {

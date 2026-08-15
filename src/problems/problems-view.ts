@@ -407,10 +407,20 @@ export async function openProblemPanel(
       const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
       vscode.env.openExternal(vscode.Uri.parse(url));
     } else if (msg.type === 'codeNow') {
+      const { getCodeNowSettings, resolveDirectory, generateFilename } = require('../settings/settings');
+      const settings = getCodeNowSettings();
+      
       const exts = [
         '.cpp', '.py', '.java', '.c', '.cs', '.go', '.hs', '.kt', '.php', '.rb', '.rs', '.js'
       ];
-      const selectedExt = await vscode.window.showQuickPick(exts, { placeHolder: 'Select language extension' });
+      
+      let selectedExt = settings.extension;
+      
+      // If there's no valid extension in settings, prompt the user
+      if (!selectedExt || !exts.includes(selectedExt)) {
+        selectedExt = await vscode.window.showQuickPick(exts, { placeHolder: 'Select language extension' });
+      }
+      
       if (selectedExt) {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -421,16 +431,38 @@ export async function openProblemPanel(
         const path = require('path');
         const fs = require('fs');
         const rootPath = workspaceFolders[0].uri.fsPath;
-        const cleanName = problem.name.replace(/[^a-zA-Z0-9]/g, '');
-        const filename = `${problem.contestId}${problem.index}-${cleanName}${selectedExt}`;
-        const filePath = vscode.Uri.file(path.join(rootPath, filename));
         
-        if (!fs.existsSync(filePath.fsPath)) {
-          fs.writeFileSync(filePath.fsPath, '', 'utf8');
+        const targetDir = resolveDirectory(settings.directory, rootPath);
+        
+        try {
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+        } catch (err) {
+          vscode.window.showErrorMessage(`Failed to create directory '${targetDir}'. Is the drive letter correct and writable? Error: ${err}`);
+          return;
         }
+
+        const filename = generateFilename(settings.filename, {
+          problemId: `${problem.contestId}${problem.index}`,
+          contestId: `${problem.contestId}`,
+          problemIndex: problem.index,
+          problemName: problem.name,
+          fileExtension: selectedExt
+        });
+
+        const filePath = vscode.Uri.file(path.join(targetDir, filename));
         
-        const doc = await vscode.workspace.openTextDocument(filePath);
-        await vscode.window.showTextDocument(doc);
+        try {
+          if (!fs.existsSync(filePath.fsPath)) {
+            fs.writeFileSync(filePath.fsPath, '', 'utf8');
+          }
+          
+          const doc = await vscode.workspace.openTextDocument(filePath);
+          await vscode.window.showTextDocument(doc);
+        } catch (err) {
+          vscode.window.showErrorMessage(`Failed to create file: ${err}`);
+        }
       }
     }
   });
