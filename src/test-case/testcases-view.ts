@@ -6,6 +6,7 @@ import { getRunCommand, compile, runTestCase } from './runner';
 export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'seudoe.testCasesView';
   private _view?: vscode.WebviewView;
+  private _currentAbortController?: AbortController;
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -36,7 +37,12 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
 
   private handleMessage(message: any) {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return;
+    if (!editor) {
+      if (message.type === 'createProblem') {
+        vscode.window.showErrorMessage("You don't have a valid source code file open! Please open a programming file (e.g. .cpp, .py, .java) before creating a problem.");
+      }
+      return;
+    }
 
     const docPath = editor.document.uri.fsPath;
     const dir = path.dirname(docPath);
@@ -55,7 +61,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
         ];
         
         if (!allowedExtensions.includes(ext)) {
-          vscode.window.showErrorMessage(`Cannot create problem: File extension '${ext}' is not supported by Codeforces.`);
+          vscode.window.showErrorMessage(`The file type '${ext}' is not supported! Please open a valid programming file to create a problem.`);
           break;
         }
 
@@ -126,6 +132,25 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       case 'runAllTestCases':
         this.executeTests(editor, docPath, seudoeFilePath, message);
         break;
+
+      case 'deleteProblem':
+        if (fs.existsSync(seudoeFilePath)) {
+          try {
+            fs.unlinkSync(seudoeFilePath);
+            this.updateWebview(editor);
+          } catch (e) {
+            console.error(e);
+            vscode.window.showErrorMessage('Failed to delete problem test cases.');
+          }
+        }
+        break;
+
+      case 'stopProcess':
+        if (this._currentAbortController) {
+          this._currentAbortController.abort();
+          this._currentAbortController = undefined;
+        }
+        break;
     }
   }
 
@@ -148,6 +173,12 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (this._currentAbortController) {
+      this._currentAbortController.abort();
+    }
+    this._currentAbortController = new AbortController();
+    const abortSignal = this._currentAbortController.signal;
+
     let compileSuccess = true;
     if (runCmd.compile) {
       await vscode.window.withProgress({
@@ -155,15 +186,18 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
         title: `Compiling ${path.basename(docPath)}...`,
         cancellable: false
       }, async () => {
-        const res = await compile(docPath, runCmd.compile!);
+        const res = await compile(docPath, runCmd.compile!, abortSignal);
         if (!res.success) {
-          vscode.window.showErrorMessage(`Compilation Failed:\\n${res.output}`);
+          vscode.window.showErrorMessage(`Compilation Failed:\n${res.output}`);
           compileSuccess = false;
         }
       });
     }
 
-    if (!compileSuccess) return;
+    if (!compileSuccess) {
+      this._currentAbortController = undefined;
+      return;
+    }
 
     const timeLimit = data.timeLimit || 3000;
     
@@ -180,12 +214,14 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       cancellable: false
     }, async (progress) => {
       for (let i = 0; i < indicesToRun.length; i++) {
+        if (abortSignal.aborted) break;
+
         const idx = indicesToRun[i];
         const test = data.tests[idx];
         
         progress.report({ message: `Test ${idx + 1}/${data.tests.length}` });
         
-        const res = await runTestCase(docPath, runCmd.run, test.input || '', timeLimit);
+        const res = await runTestCase(docPath, runCmd.run, test.input || '', timeLimit, abortSignal);
         
         if (res.error) {
           test.output = (res.error + (res.stderr ? '\n' + res.stderr : '')).replace(/\r/g, '');
@@ -197,6 +233,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
         }
       }
       
+      this._currentAbortController = undefined;
       fs.writeFileSync(seudoeFilePath, JSON.stringify(data, null, 2), 'utf8');
       this.updateWebview(editor);
     });
@@ -341,16 +378,27 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
           <div><span>TC ${i + 1}</span>${statusHtml}</div>
           <div class="tc-actions">
             <button class="icon-btn play">▶</button>
-            <button class="icon-btn delete">🗑</button>
+            <button class="icon-btn delete" title="Delete Testcase">✖</button>
           </div>
         </div>
         <div class="tc-body">
-          <label>Input:</label>
+          <div class="label-row">
+            <label>Input:</label>
+            <button class="icon-btn copy-btn" data-target=".tc-input" title="Copy Input">Copy</button>
+          </div>
           <textarea class="tc-input" rows="${getRows(t.input)}">${t.input || ''}</textarea>
-          <label>Expected Output:</label>
+          
+          <div class="label-row">
+            <label>Expected Output:</label>
+            <button class="icon-btn copy-btn" data-target=".tc-answer" title="Copy Expected Output">Copy</button>
+          </div>
           <textarea class="tc-answer" rows="${getRows(t.answer)}">${t.answer || ''}</textarea>
+          
           ${t.output ? `
-          <label>Output:</label>
+          <div class="label-row">
+            <label>Output:</label>
+            <button class="icon-btn copy-btn" data-target=".tc-output" title="Copy Output">Copy</button>
+          </div>
           <textarea class="tc-output" readonly rows="${getRows(t.output)}">${t.output}</textarea>
           ` : ''}
         </div>
@@ -436,6 +484,26 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       display: flex;
       flex-direction: column;
       gap: 8px;
+    }
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: -4px;
+    }
+    .label-row .icon-btn {
+      background: transparent;
+      border: 1px solid var(--vscode-panel-border);
+      color: var(--vscode-descriptionForeground);
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .label-row .icon-btn:hover {
+      background: rgba(255,255,255,0.1);
     }
     label {
       font-size: 11px;
@@ -529,9 +597,13 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   <div class="actions-container">
     <div class="actions-row">
       <button class="btn btn-green" id="new-testcase-btn">+ New Testcase</button>
-      <button class="btn btn-blue">Custom Checker</button>
+      <button class="btn btn-blue" disabled style="opacity: 0.5; cursor: not-allowed;" title="Coming soon!">Custom Checker</button>
     </div>
-    <button class="btn btn-blue" id="run-all-btn" style="width: 100%;">Run All</button>
+    <div class="actions-row">
+      <button class="btn btn-blue" id="run-all-btn" style="flex: 2;">Run All</button>
+      <button class="btn" id="stop-btn" style="flex: 1; background: #d4a72c; color: white;" title="Stop Process">Stop</button>
+      <button class="btn" id="delete-problem-btn" style="flex: 1; background: #e51400; color: white;">Delete</button>
+    </div>
   </div>
 
   <script>
@@ -574,6 +646,29 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
 
     document.getElementById('run-all-btn').addEventListener('click', () => {
       vscode.postMessage({ type: 'runAllTestCases' });
+    });
+
+    document.getElementById('stop-btn').addEventListener('click', () => {
+      vscode.postMessage({ type: 'stopProcess' });
+    });
+
+    document.getElementById('delete-problem-btn').addEventListener('click', () => {
+      vscode.postMessage({ type: 'deleteProblem' });
+    });
+
+    // Copy buttons
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const targetSelector = btn.getAttribute('data-target');
+        const textarea = btn.closest('.tc-body').querySelector(targetSelector);
+        if (textarea) {
+          navigator.clipboard.writeText(textarea.value).then(() => {
+            const originalText = btn.innerText;
+            btn.innerText = '✓';
+            setTimeout(() => btn.innerText = originalText, 1500);
+          });
+        }
+      });
     });
 
     // Auto-resize all textareas to fit content exactly

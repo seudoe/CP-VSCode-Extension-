@@ -69,23 +69,30 @@ function resolveCommand(cmdArray: string[], sourcePath: string): string[] {
   });
 }
 
-export async function compile(sourcePath: string, cmdTemplate: string[]): Promise<{ success: boolean; output: string }> {
+export async function compile(sourcePath: string, cmdTemplate: string[], abortSignal?: AbortSignal): Promise<{ success: boolean; output: string }> {
   const resolvedArgs = resolveCommand(cmdTemplate, sourcePath);
   const command = resolvedArgs[0];
   const args = resolvedArgs.slice(1);
   
   return new Promise((resolve) => {
+    let output = '';
     const child = child_process.spawn(command, args, { cwd: path.dirname(sourcePath) });
     
-    let out = '';
-    child.stdout.on('data', (d) => out += d.toString());
-    child.stderr.on('data', (d) => out += d.toString());
+    if (abortSignal) {
+      abortSignal.addEventListener('abort', () => {
+        child.kill();
+        resolve({ success: false, output: output + '\n[Process Interrupted]' });
+      });
+    }
+    
+    child.stdout.on('data', (d) => output += d.toString());
+    child.stderr.on('data', (d) => output += d.toString());
     
     child.on('close', (code) => {
       if (code !== 0) {
-        resolve({ success: false, output: out || `Compilation failed with exit code ${code}` });
+        resolve({ success: false, output: output || `Compilation failed with exit code ${code}` });
       } else {
-        resolve({ success: true, output: out });
+        resolve({ success: true, output: output });
       }
     });
 
@@ -99,7 +106,8 @@ export async function runTestCase(
   sourcePath: string, 
   cmdTemplate: string[], 
   input: string, 
-  timeLimitMs: number
+  timeLimitMs: number,
+  abortSignal?: AbortSignal
 ): Promise<RunResult> {
   const resolvedArgs = resolveCommand(cmdTemplate, sourcePath);
   let command = resolvedArgs[0];
@@ -124,6 +132,14 @@ export async function runTestCase(
       cwd: path.dirname(sourcePath)
     });
 
+    let isAborted = false;
+    if (abortSignal) {
+      abortSignal.addEventListener('abort', () => {
+        isAborted = true;
+        child.kill();
+      });
+    }
+
     let isTimeout = false;
     const timer = setTimeout(() => {
       isTimeout = true;
@@ -143,7 +159,9 @@ export async function runTestCase(
       const timeMs = Date.now() - startTime;
       
       let errorMsg = undefined;
-      if (isTimeout) {
+      if (isAborted) {
+        errorMsg = `Process Interrupted`;
+      } else if (isTimeout) {
         errorMsg = `Time Limit Exceeded (${timeLimitMs}ms)`;
       } else if (code !== 0) {
         errorMsg = `Runtime Error (Exit code ${code})`;

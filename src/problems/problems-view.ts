@@ -482,7 +482,7 @@ export async function openProblemPanel(
             }));
           }
 
-          const boilerplate = {
+          let finalSeudoeData: any = {
             name: `${problem.contestId}${problem.index} - ${problem.name}`,
             url: `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`,
             tests: testsArray,
@@ -494,7 +494,31 @@ export async function openProblemPanel(
             local: true
           };
 
-          fs.writeFileSync(seudoeFilePath, JSON.stringify(boilerplate, null, 2), 'utf8');
+          if (fs.existsSync(seudoeFilePath)) {
+            try {
+              const existingData = JSON.parse(fs.readFileSync(seudoeFilePath, 'utf8'));
+              if (existingData.tests && Array.isArray(existingData.tests)) {
+                const existingTests = existingData.tests;
+                const normalize = (s: string) => (s || '').trim().split(/\\s+/).join(' ');
+                
+                testsArray.forEach(newTest => {
+                  const newIn = normalize(newTest.input);
+                  const newAns = normalize(newTest.answer);
+                  
+                  const exists = existingTests.some((t: any) => normalize(t.input) === newIn && normalize(t.answer) === newAns);
+                  if (!exists) {
+                    existingTests.push(newTest);
+                  }
+                });
+                
+                finalSeudoeData = { ...existingData, tests: existingTests };
+              }
+            } catch (e) {
+              console.error('Failed to parse existing .seudoe file for merging', e);
+            }
+          }
+
+          fs.writeFileSync(seudoeFilePath, JSON.stringify(finalSeudoeData, null, 2), 'utf8');
 
           const doc = await vscode.workspace.openTextDocument(filePath);
           await vscode.window.showTextDocument(doc);

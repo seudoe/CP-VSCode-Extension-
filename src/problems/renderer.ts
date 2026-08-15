@@ -307,7 +307,7 @@ body {
 .hdr { padding: 24px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 28px; }
 .contest-pill {
   display: inline-block;
-  font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
   color: var(--accent); margin-bottom: 8px;
 }
 .prob-title { font-size: 23px; font-weight: 700; line-height: 1.3; }
@@ -460,7 +460,7 @@ li { margin: 5px 0; }
 
 <!-- ── Header ── -->
 <div class="hdr">
-  <div class="contest-pill">${esc(contestName?.toUpperCase() || `CONTEST ${contestId}`)}</div>
+  <div class="contest-pill">${contestId} - ${esc(contestName?.toUpperCase() || `CONTEST`)}</div>
   <div class="prob-title">${esc(statement.title)}</div>
   <button class="detail-btn" id="btn-browser-top" style="margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent); text-decoration: underline; cursor: pointer;">View in Browser</button>
 
