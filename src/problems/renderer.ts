@@ -26,25 +26,25 @@ function esc(s: string): string {
 }
 
 function ratingColor(r?: number): string {
-  if (!r) return '#808080';
-  if (r < 1200) return '#808080';
-  if (r < 1400) return '#008000';
-  if (r < 1600) return '#03A89E';
-  if (r < 1900) return '#1a8cff';
-  if (r < 2100) return '#AA00AA';
-  if (r < 2400) return '#FF8C00';
+  if (!r) {return '#808080';}
+  if (r < 1200) {return '#808080';}
+  if (r < 1400) {return '#008000';}
+  if (r < 1600) {return '#03A89E';}
+  if (r < 1900) {return '#1a8cff';}
+  if (r < 2100) {return '#AA00AA';}
+  if (r < 2400) {return '#FF8C00';}
   return '#FF0000';
 }
 
 function ratingLabel(r?: number): string {
-  if (!r) return '';
-  if (r < 1200) return 'Newbie';
-  if (r < 1400) return 'Pupil';
-  if (r < 1600) return 'Specialist';
-  if (r < 1900) return 'Expert';
-  if (r < 2100) return 'Candidate Master';
-  if (r < 2400) return 'Master';
-  if (r < 3000) return 'Grandmaster';
+  if (!r) {return '';}
+  if (r < 1200) {return 'Newbie';}
+  if (r < 1400) {return 'Pupil';}
+  if (r < 1600) {return 'Specialist';}
+  if (r < 1900) {return 'Expert';}
+  if (r < 2100) {return 'Candidate Master';}
+  if (r < 2400) {return 'Master';}
+  if (r < 3000) {return 'Grandmaster';}
   return 'Legendary';
 }
 

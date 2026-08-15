@@ -155,7 +155,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async executeTests(editor: vscode.TextEditor, docPath: string, seudoeFilePath: string, message: any) {
-    if (!fs.existsSync(seudoeFilePath)) return;
+    if (!fs.existsSync(seudoeFilePath)) {return;}
     
     let data: any;
     try {
@@ -214,7 +214,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       cancellable: false
     }, async (progress) => {
       for (let i = 0; i < indicesToRun.length; i++) {
-        if (abortSignal.aborted) break;
+        if (abortSignal.aborted) {break;}
 
         const idx = indicesToRun[i];
         const test = data.tests[idx];

@@ -18,6 +18,10 @@ import { CachedProblem } from './types';
 // ── Load MONGODB_URI from .env.local ─────────────────────────────────────────
 
 function loadMongoUri(): string {
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+
   // esbuild output is dist/extension.js, so extensionPath = dist/..
   // .env.local lives next to package.json, two levels up from dist/
   const candidates = [

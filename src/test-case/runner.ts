@@ -20,17 +20,17 @@ export async function getRunCommand(extension: string, extensionUriPath: string)
   const ext = extension.startsWith('.') ? extension.substring(1) : extension;
   const configPath = path.join(extensionUriPath, 'resources', 'run-commands.json');
   
-  if (!fs.existsSync(configPath)) return null;
+  if (!fs.existsSync(configPath)) {return null;}
   
   try {
     const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     const langData = data[ext];
-    if (!langData) return null;
+    if (!langData) {return null;}
     
     let platformKey = process.platform === 'win32' ? 'win32' : (process.platform === 'darwin' ? 'darwin' : 'linux');
     const platformData = langData[platformKey] || langData['linux'] || langData['win32'];
     
-    if (!platformData) return null;
+    if (!platformData) {return null;}
 
     const config = vscode.workspace.getConfiguration('seuCF');
     const compilers = config.get<Record<string, string>>('compilers') || {};

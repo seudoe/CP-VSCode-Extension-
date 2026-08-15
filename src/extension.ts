@@ -48,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
         prompt: 'Enter your Codeforces handle to fetch submissions',
         placeHolder: 'e.g. tourist'
       });
-      if (!handle) return;
+      if (!handle) {return;}
 
       vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
@@ -87,8 +87,8 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const contestMap = new Map<number, string>();
-      for (const c of contestsDb.past) contestMap.set(c.contest.id, c.contest.name);
-      for (const c of contestsDb.upcoming) contestMap.set(c.contest.id, c.contest.name);
+      for (const c of contestsDb.past) {contestMap.set(c.contest.id, c.contest.name);}
+      for (const c of contestsDb.upcoming) {contestMap.set(c.contest.id, c.contest.name);}
 
       interface ProblemQuickPickItem extends vscode.QuickPickItem {
         problem: CFProblem;

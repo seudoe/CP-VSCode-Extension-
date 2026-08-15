@@ -1,8 +1,14 @@
 {
   "name": "seudoe",
-  "displayName": "Competitive Programming",
+  "displayName": "Seudoe Competitive Programming",
   "description": "All around CodeForces Extension",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "publisher": "seudoe",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seudoe/CP-VSCode-Extension-"
+  },
+  "icon": "media/seudoeCF-Extension-black.png",
   "engines": {
     "vscode": "^1.125.0"
   },
@@ -59,7 +65,7 @@
         {
           "id": "seudoe-problems",
           "title": "CF Problems",
-          "icon": "media/bird.svg"
+          "icon": "media/problems.svg"
         },
         {
           "id": "seudoe-testcases",
@@ -72,14 +78,16 @@
       "seudoe-problems": [
         {
           "id": "seudoe.problemsView",
-          "name": "Problems"
+          "name": "Problems",
+          "icon": "media/problems.svg"
         }
       ],
       "seudoe-testcases": [
         {
           "type": "webview",
           "id": "seudoe.testCasesView",
-          "name": "Test Cases"
+          "name": "Test Cases",
+          "icon": "media/testcase.svg"
         }
       ]
     },
@@ -96,7 +104,18 @@
           "default": "Select everytime",
           "enum": [
             "Select everytime",
-            ".cpp", ".py", ".java", ".c", ".cs", ".go", ".hs", ".kt", ".php", ".rb", ".rs", ".js"
+            ".cpp",
+            ".py",
+            ".java",
+            ".c",
+            ".cs",
+            ".go",
+            ".hs",
+            ".kt",
+            ".php",
+            ".rb",
+            ".rs",
+            ".js"
           ],
           "description": "Default file extension used for the 'Code Now' button. Set to 'Select everytime' to manually choose the language on each click."
         },

@@ -1,71 +1,48 @@
-# seudoe README
+# Competitive Programming (seudoe)
 
-This is the README for your extension "seudoe". After writing up a brief description, we recommend including the following sections.
+The ultimate all-in-one Codeforces companion directly inside Visual Studio Code. Browse, read, code, and test Codeforces problems seamlessly without ever leaving your editor!
 
-## Features
+## 📌 Views & Sidebars
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- **CF Problems**: A dedicated sidebar featuring an organized directory of Codeforces problems. Browse problems by *All*, *Tags*, *Ratings*, or explore *Past Contests*.
+- **CF Test Cases**: A dynamic, interactive sidebar that manages inputs, expected outputs, and test execution for your current problem. 
 
-For example if there is an image subfolder under your extension project workspace:
+## 🚀 Features
 
-\!\[feature X\]\(images/feature-x.png\)
+### Comprehensive Problem Discovery
+- **Lists**: Browse problems by All, Tags, Ratings, and Contests.
+- **Visual Features**: Clean, colored UI indicators (like problem difficulty ratings and colored labels).
+- **User Integration**: See your Codeforces user details and view your submission history integrated right into the problems list!
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+### Seamless Coding Workflow
+- **Beautiful Problem Renderer**: Renders Codeforces Problem Statements beautifully inside a VS Code webview, featuring full KaTeX math support and a clean dark-mode UI.
+- **Code Now**: One click generates a local source code file tailored to your settings, automatically imports the problem's Input/Output tests, and sets up your environment instantly.
+- **Boilerplates**: Start coding faster! Support for default boilerplates, custom inline boilerplates, or even loading boilerplates from an external file template. *Features robust error/warning notifications for boilerplate configuration issues.*
 
-## Requirements
+### Integrated Test Runner
+- **Code Runner**: Run your code against the official test cases effortlessly inside VS Code.
+- **Cross-Platform**: Fully supports Windows, Linux, and macOS environments.
+- **Custom Compilers**: Supports different compilers for each type of programming language (e.g., configure `g++` or `clang++` for C++, `python` or `python3` for Python, etc.).
+- **Visual Helper**: Clear visual feedback (green/red highlights) indicating exactly which test cases passed or failed.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## ⚙️ Extension Settings
 
-## Extension Settings
+Customize the extension to match your exact workflow. Access these through VS Code Settings by searching for `seuCF`.
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+- `seuCF.fileCreationDirectory`: Set an absolute or workspace-relative path where 'Code Now' will save your generated problem files.
+- `seuCF.fileName`: Customize the template for naming generated files. (Placeholders include `{problemId}`, `{problemName}`, `{contestId}`, `{problemIndex}`, `{fileExtension}`).
+- `seuCF.defaultFileExtension`: Set your default programming language extension (e.g. `.cpp`, `.py`) or leave it as "Select everytime" to be prompted.
+- `seuCF.boilerplateCodes`: Define your custom boilerplate templates per language. You can write an array of strings or load from an absolute file path using the `file:` prefix (e.g., `"cpp": "file:C:\\templates\\cpp.txt"`).
+- `seuCF.compilers`: Set your preferred compilers or interpreters for each language. (e.g., `{"cpp": "clang++", "py": "python3"}`).
 
-For example:
+## 🔮 Upcoming Features
 
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+We're constantly working to improve your CP workflow! Here are some features on the roadmap:
+- Submit code to Codeforces directly from the extension!
+- CP-31 Problems list integration.
+- CSES Problem Set integration.
+- Custom Checker support for test cases with multiple valid outputs.
+- Additional UI toggles (Settings to enable/disable rating tags and colors in problem name labels).
 
 ---
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+*Created by [seudoe](https://github.com/seudoe/seudoe)*

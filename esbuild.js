@@ -23,11 +23,26 @@ const esbuildProblemMatcherPlugin = {
 	},
 };
 
+const fs = require('fs');
+
+let mongoUri = '';
+try {
+	const envLocal = fs.readFileSync('.env.local', 'utf8');
+	envLocal.split('\n').forEach(line => {
+		if (line.trim().startsWith('MONGODB_URI=')) {
+			mongoUri = line.split('=')[1].trim();
+		}
+	});
+} catch (e) {
+	// Ignore if file doesn't exist
+}
+
 async function main() {
 	const ctx = await esbuild.context({
 		entryPoints: [
 			'src/extension.ts'
 		],
+		define: mongoUri ? { 'process.env.MONGODB_URI': JSON.stringify(mongoUri) } : {},
 		bundle: true,
 		format: 'cjs',
 		minify: production,

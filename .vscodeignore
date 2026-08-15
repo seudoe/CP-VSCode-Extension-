@@ -12,3 +12,9 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+
+local-database/**
+before_publishing.md
+debug.html
+scraperHelp.md
+CHANGELOG.md

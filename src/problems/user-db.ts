@@ -16,7 +16,7 @@ export function initUserDb(storagePath: string) {
 }
 
 export function getUserDetails(): UserDetails | null {
-  if (!dbPath) return null;
+  if (!dbPath) {return null;}
   try {
     if (fs.existsSync(dbPath)) {
       const data = fs.readFileSync(dbPath, 'utf8');
@@ -29,7 +29,7 @@ export function getUserDetails(): UserDetails | null {
 }
 
 export function saveUserDetails(details: UserDetails): void {
-  if (!dbPath) return;
+  if (!dbPath) {return;}
   try {
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
@@ -79,7 +79,7 @@ export async function fetchUserStatus(handle: string): Promise<UserDetails> {
   for (const sub of submissions) {
     const contestId = sub.problem?.contestId;
     const index = sub.problem?.index;
-    if (contestId === undefined || index === undefined) continue;
+    if (contestId === undefined || index === undefined) {continue;}
     
     const id = `${contestId}${index}`;
     if (!problems.has(id)) {
@@ -87,7 +87,7 @@ export async function fetchUserStatus(handle: string): Promise<UserDetails> {
     }
     
     const p = problems.get(id)!;
-    if (p.accepted) continue;
+    if (p.accepted) {continue;}
     
     const verdict = sub.verdict;
     if (verdict === 'OK') {
