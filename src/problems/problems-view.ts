@@ -524,7 +524,17 @@ export async function openProblemPanel(
       return;
     }
     if (currentPanel) {
-      currentPanel.webview.html = renderProblem(cached, problem, currentPanel.webview, context.extensionUri);
+      let contestName: string | undefined;
+      if (problem.contestId) {
+        const { readContestDb } = require('./contest-db');
+        const db = readContestDb();
+        const contest = db.past.find((c: any) => c.contest.id === problem.contestId)?.contest
+                     || db.upcoming.find((c: any) => c.contest.id === problem.contestId)?.contest;
+        if (contest) {
+          contestName = contest.name;
+        }
+      }
+      currentPanel.webview.html = renderProblem(cached, problem, currentPanel.webview, context.extensionUri, contestName);
     }
   } catch (err) {
     console.error(`[seudoe] MongoDB fetch failed for ${id}:`, err);

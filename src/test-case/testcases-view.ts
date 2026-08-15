@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getRunCommand, compile, runTestCase } from './runner';
 
 export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'seudoe.testCasesView';
@@ -102,13 +103,103 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
             const data = JSON.parse(fs.readFileSync(seudoeFilePath, 'utf8'));
             data.tests = message.tests;
             fs.writeFileSync(seudoeFilePath, JSON.stringify(data, null, 2), 'utf8');
-            // Deliberately NOT calling updateWebview here so we don't steal focus from the textarea
           } catch (e) {
             console.error(e);
           }
         }
         break;
+
+      case 'deleteTestCase':
+        if (fs.existsSync(seudoeFilePath)) {
+          try {
+            const data = JSON.parse(fs.readFileSync(seudoeFilePath, 'utf8'));
+            data.tests.splice(message.index, 1);
+            fs.writeFileSync(seudoeFilePath, JSON.stringify(data, null, 2), 'utf8');
+            this.updateWebview(editor);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        break;
+
+      case 'runTestCase':
+      case 'runAllTestCases':
+        this.executeTests(editor, docPath, seudoeFilePath, message);
+        break;
     }
+  }
+
+  private async executeTests(editor: vscode.TextEditor, docPath: string, seudoeFilePath: string, message: any) {
+    if (!fs.existsSync(seudoeFilePath)) return;
+    
+    let data: any;
+    try {
+      data = JSON.parse(fs.readFileSync(seudoeFilePath, 'utf8'));
+    } catch (e) {
+      vscode.window.showErrorMessage('Failed to read test cases.');
+      return;
+    }
+
+    const ext = path.extname(docPath);
+    const runCmd = await getRunCommand(ext, this._extensionUri.fsPath);
+    
+    if (!runCmd) {
+      vscode.window.showErrorMessage(`Running files with extension ${ext} is not supported yet.`);
+      return;
+    }
+
+    let compileSuccess = true;
+    if (runCmd.compile) {
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: `Compiling ${path.basename(docPath)}...`,
+        cancellable: false
+      }, async () => {
+        const res = await compile(docPath, runCmd.compile!);
+        if (!res.success) {
+          vscode.window.showErrorMessage(`Compilation Failed:\\n${res.output}`);
+          compileSuccess = false;
+        }
+      });
+    }
+
+    if (!compileSuccess) return;
+
+    const timeLimit = data.timeLimit || 3000;
+    
+    let indicesToRun = [];
+    if (message.type === 'runTestCase') {
+      indicesToRun = [message.index];
+    } else {
+      indicesToRun = data.tests.map((_: any, i: number) => i);
+    }
+
+    vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: `Running Test Cases...`,
+      cancellable: false
+    }, async (progress) => {
+      for (let i = 0; i < indicesToRun.length; i++) {
+        const idx = indicesToRun[i];
+        const test = data.tests[idx];
+        
+        progress.report({ message: `Test ${idx + 1}/${data.tests.length}` });
+        
+        const res = await runTestCase(docPath, runCmd.run, test.input || '', timeLimit);
+        
+        if (res.error) {
+          test.output = (res.error + (res.stderr ? '\n' + res.stderr : '')).replace(/\r/g, '');
+        } else {
+          test.output = res.stdout.replace(/\r/g, '');
+          if (res.stderr) {
+             test.output += '\n[STDERR]\n' + res.stderr.replace(/\r/g, '');
+          }
+        }
+      }
+      
+      fs.writeFileSync(seudoeFilePath, JSON.stringify(data, null, 2), 'utf8');
+      this.updateWebview(editor);
+    });
   }
 
   private updateWebview(editor: vscode.TextEditor | undefined) {
@@ -223,12 +314,31 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForTestCases(data: any): string {
+    let passedCount = 0;
     const testsHtml = (data.tests || []).map((t: any, i: number) => {
-      const getRows = (text: string) => Math.min(25, Math.max(2, (text || '').split('\n').length));
+      const getRows = (text: string) => Math.min(25, Math.max(2, (text || '').split('\\n').length));
+      
+      let statusHtml = '';
+      let statusClass = '';
+      if (t.output !== undefined && t.output !== '') {
+        const normalize = (s: string) => (s || '').trim().split(/\\s+/).join(' ');
+        const expected = normalize(t.answer);
+        const actual = normalize(t.output);
+        
+        if (expected === actual) {
+          statusHtml = `<span style="color: #4fb56b; font-weight: bold; font-size: 12px; margin-left: 8px;">✓ Passed</span>`;
+          statusClass = 'passed-bg';
+          passedCount++;
+        } else {
+          statusHtml = `<span style="color: #f14c4c; font-weight: bold; font-size: 12px; margin-left: 8px;">✗ Failed</span>`;
+          statusClass = 'failed-bg';
+        }
+      }
+
       return `
-      <div class="test-case" data-index="${i}">
+      <div class="test-case ${statusClass}" data-index="${i}">
         <div class="tc-header">
-          <span>TC ${i + 1}</span>
+          <div><span>TC ${i + 1}</span>${statusHtml}</div>
           <div class="tc-actions">
             <button class="icon-btn play">▶</button>
             <button class="icon-btn delete">🗑</button>
@@ -278,7 +388,15 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       border-radius: 8px;
       overflow: hidden;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      transition: border-color 0.2s ease;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .test-case.passed-bg {
+      background: rgba(79, 181, 107, 0.08);
+      border-color: rgba(79, 181, 107, 0.3);
+    }
+    .test-case.failed-bg {
+      background: rgba(241, 76, 76, 0.08);
+      border-color: rgba(241, 76, 76, 0.3);
     }
     .test-case:hover {
       border-color: var(--vscode-focusBorder);
@@ -401,7 +519,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="header">
     <span>${data.name || 'Unknown'}</span>
-    <span style="color: #aaa">0 / ${data.tests?.length || 0} passed</span>
+    <span style="color: #aaa">${passedCount} / ${data.tests?.length || 0} passed</span>
   </div>
   
   <div class="test-cases">
@@ -413,7 +531,7 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
       <button class="btn btn-green" id="new-testcase-btn">+ New Testcase</button>
       <button class="btn btn-blue">Custom Checker</button>
     </div>
-    <button class="btn btn-blue" style="width: 100%;">Run All</button>
+    <button class="btn btn-blue" id="run-all-btn" style="width: 100%;">Run All</button>
   </div>
 
   <script>
@@ -438,6 +556,35 @@ export class TestCasesViewProvider implements vscode.WebviewViewProvider {
 
       if (inputEl) inputEl.addEventListener('input', save);
       if (answerEl) answerEl.addEventListener('input', save);
+
+      const playBtn = div.querySelector('.play');
+      if (playBtn) {
+        playBtn.addEventListener('click', () => {
+          vscode.postMessage({ type: 'runTestCase', index });
+        });
+      }
+
+      const delBtn = div.querySelector('.delete');
+      if (delBtn) {
+        delBtn.addEventListener('click', () => {
+          vscode.postMessage({ type: 'deleteTestCase', index });
+        });
+      }
+    });
+
+    document.getElementById('run-all-btn').addEventListener('click', () => {
+      vscode.postMessage({ type: 'runAllTestCases' });
+    });
+
+    // Auto-resize all textareas to fit content exactly
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+    document.querySelectorAll('textarea').forEach(ta => {
+      ta.addEventListener('input', () => autoResize(ta));
+      // Slight delay to ensure DOM is fully laid out before calculating scrollHeight
+      setTimeout(() => autoResize(ta), 0);
     });
   </script>
 </body>

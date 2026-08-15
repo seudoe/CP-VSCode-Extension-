@@ -1,0 +1,46 @@
+{
+  "cpp": {
+    "compile": ["g++", "{source}", "-O2", "-Wall", "-o", "{binary}"],
+    "run": ["{binary}"]
+  },
+  "c": {
+    "compile": ["gcc", "{source}", "-O2", "-Wall", "-o", "{binary}"],
+    "run": ["{binary}"]
+  },
+  "py": {
+    "run": ["python", "{source}"]
+  },
+  "java": {
+    "compile": ["javac", "-d", "{binary_dir}", "{source}"],
+    "run": ["java", "-cp", "{binary_dir}", "Main"]
+  },
+  "go": {
+    "compile": ["go", "build", "-o", "{binary}", "{source}"],
+    "run": ["{binary}"]
+  },
+  "js": {
+    "run": ["node", "{source}"]
+  },
+  "rs": {
+    "compile": ["rustc", "-O", "{source}", "-o", "{binary}"],
+    "run": ["{binary}"]
+  },
+  "cs": {
+    "compile": ["csc", "-optimize", "{source}", "-out:{binary}.exe"],
+    "run": ["{binary}.exe"]
+  },
+  "hs": {
+    "compile": ["ghc", "-O2", "{source}", "-o", "{binary}"],
+    "run": ["{binary}"]
+  },
+  "kt": {
+    "compile": ["kotlinc", "{source}", "-include-runtime", "-d", "{binary}.jar"],
+    "run": ["java", "-jar", "{binary}.jar"]
+  },
+  "php": {
+    "run": ["php", "{source}"]
+  },
+  "rb": {
+    "run": ["ruby", "{source}"]
+  }
+}

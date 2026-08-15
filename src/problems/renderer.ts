@@ -225,6 +225,7 @@ export function renderProblem(
   meta: CFProblem | undefined,
   _webview: vscode.Webview,
   _extensionUri: vscode.Uri,
+  contestName?: string
 ): string {
   const { statement, contestId, index } = cached;
   const id = `${contestId}${index}`;
@@ -459,7 +460,7 @@ li { margin: 5px 0; }
 
 <!-- ── Header ── -->
 <div class="hdr">
-  <div class="contest-pill">Contest ${contestId} &middot; Problem ${index}</div>
+  <div class="contest-pill">${esc(contestName?.toUpperCase() || `CONTEST ${contestId}`)}</div>
   <div class="prob-title">${esc(statement.title)}</div>
   <button class="detail-btn" id="btn-browser-top" style="margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--accent); text-decoration: underline; cursor: pointer;">View in Browser</button>
 
