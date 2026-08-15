@@ -127,7 +127,7 @@ class ProblemItem extends vscode.TreeItem {
 
     super(`[${id}] ${problem.name}`, vscode.TreeItemCollapsibleState.None);
     this.description = problem.rating ? `★ ${problem.rating}` : '';
-    this.tooltip = problem.tags.length
+    this.tooltip = problem.tags?.length
       ? `Tags: ${problem.tags.join(', ')}`
       : 'No tags';
     this.contextValue = 'problem';
@@ -138,7 +138,7 @@ class ProblemItem extends vscode.TreeItem {
     );
 
     const userDetails = provider.getUserDetails();
-    const statusStr = userDetails?.problems[id];
+    const statusStr = userDetails?.problems?.[id];
 
     if (statusStr) {
       this.iconPath = generateStatusIcon(statusStr, provider.getExtensionUri());
@@ -406,6 +406,32 @@ export async function openProblemPanel(
     } else if (msg.type === 'openBrowser') {
       const url = `https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`;
       vscode.env.openExternal(vscode.Uri.parse(url));
+    } else if (msg.type === 'codeNow') {
+      const exts = [
+        '.cpp', '.py', '.java', '.c', '.cs', '.go', '.hs', '.kt', '.php', '.rb', '.rs', '.js'
+      ];
+      const selectedExt = await vscode.window.showQuickPick(exts, { placeHolder: 'Select language extension' });
+      if (selectedExt) {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+          vscode.window.showErrorMessage('Please open a workspace folder first to create code files.');
+          return;
+        }
+        
+        const path = require('path');
+        const fs = require('fs');
+        const rootPath = workspaceFolders[0].uri.fsPath;
+        const cleanName = problem.name.replace(/[^a-zA-Z0-9]/g, '');
+        const filename = `${problem.contestId}${problem.index}-${cleanName}${selectedExt}`;
+        const filePath = vscode.Uri.file(path.join(rootPath, filename));
+        
+        if (!fs.existsSync(filePath.fsPath)) {
+          fs.writeFileSync(filePath.fsPath, '', 'utf8');
+        }
+        
+        const doc = await vscode.workspace.openTextDocument(filePath);
+        await vscode.window.showTextDocument(doc);
+      }
     }
   });
 

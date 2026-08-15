@@ -467,6 +467,7 @@ li { margin: 5px 0; }
     <span class="pill"><span>&#9201;</span><strong>${esc(statement.timeLimit)}</strong></span>
     <span class="pill"><span>&#128190;</span><strong>${esc(statement.memoryLimit)}</strong></span>
     ${meta?.rating ? `<span class="pill pill-rating"><strong>${meta.rating}</strong><span style="opacity:.6;font-size:11px;margin-left:3px">${label}</span></span>` : ''}
+    <button class="copy-btn" id="btn-code-now-top" style="background: var(--accent); color: #fff; font-weight: bold; border: none; padding: 4px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; margin-left: auto;">Code Now</button>
   </div>
 
   <!-- Tags (collapsed by default) -->
@@ -500,6 +501,10 @@ li { margin: 5px 0; }
 <div class="section">
   <div class="sec-title">Examples</div>
   ${examplesHtml}
+</div>
+
+<div class="section" style="display: flex; justify-content: flex-end; margin-top: -10px; margin-bottom: 20px;">
+  <button class="btn btn-blue" id="btn-code-now-bottom" style="background: linear-gradient(135deg, #007acc, #005a9e); color: #fff; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,122,204,0.3);">Code Now</button>
 </div>
 
 ${noteHtml ? `
@@ -568,6 +573,11 @@ ${noteHtml ? `
   const openBrowser = () => vsApi.postMessage({ type: 'openBrowser' });
   document.getElementById('btn-browser-top')?.addEventListener('click', openBrowser);
   document.getElementById('btn-browser-bottom')?.addEventListener('click', openBrowser);
+
+  // ── Code Now ───────────────────────────────────────────────────────────────
+  const doCodeNow = () => vsApi.postMessage({ type: 'codeNow' });
+  document.getElementById('btn-code-now-top')?.addEventListener('click', doCodeNow);
+  document.getElementById('btn-code-now-bottom')?.addEventListener('click', doCodeNow);
 </script>
 
 
