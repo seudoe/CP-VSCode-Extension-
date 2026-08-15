@@ -1,46 +1,151 @@
 {
   "cpp": {
-    "compile": ["g++", "{source}", "-O2", "-Wall", "-o", "{binary}"],
-    "run": ["{binary}"]
+    "win32": {
+      "g++": { "compile": ["g++", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}.exe"] },
+      "clang": { "compile": ["clang++", "{source}", "-O2", "-Wall", "-o", "{binary}.exe"], "run": ["{binary}.exe"] },
+      "msvc": { "compile": ["cl", "/O2", "/EHsc", "{source}", "/Fe:{binary}.exe"], "run": ["{binary}.exe"] }
+    },
+    "linux": {
+      "g++": { "compile": ["g++", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] },
+      "clang": { "compile": ["clang++", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] }
+    },
+    "darwin": {
+      "clang": { "compile": ["clang++", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] },
+      "g++": { "compile": ["g++", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] }
+    }
   },
   "c": {
-    "compile": ["gcc", "{source}", "-O2", "-Wall", "-o", "{binary}"],
-    "run": ["{binary}"]
+    "win32": {
+      "gcc": { "compile": ["gcc", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}.exe"] },
+      "clang": { "compile": ["clang", "{source}", "-O2", "-Wall", "-o", "{binary}.exe"], "run": ["{binary}.exe"] },
+      "msvc": { "compile": ["cl", "/O2", "{source}", "/Fe:{binary}.exe"], "run": ["{binary}.exe"] }
+    },
+    "linux": {
+      "gcc": { "compile": ["gcc", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] },
+      "clang": { "compile": ["clang", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] }
+    },
+    "darwin": {
+      "clang": { "compile": ["clang", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] },
+      "gcc": { "compile": ["gcc", "{source}", "-O2", "-Wall", "-o", "{binary}"], "run": ["{binary}"] }
+    }
   },
   "py": {
-    "run": ["python", "{source}"]
+    "win32": {
+      "python": { "run": ["python", "{source}"] },
+      "python3": { "run": ["python3", "{source}"] },
+      "pypy": { "run": ["pypy", "{source}"] }
+    },
+    "linux": {
+      "python3": { "run": ["python3", "{source}"] },
+      "python": { "run": ["python", "{source}"] },
+      "pypy3": { "run": ["pypy3", "{source}"] }
+    },
+    "darwin": {
+      "python3": { "run": ["python3", "{source}"] },
+      "python": { "run": ["python", "{source}"] },
+      "pypy3": { "run": ["pypy3", "{source}"] }
+    }
   },
   "java": {
-    "compile": ["javac", "-d", "{binary_dir}", "{source}"],
-    "run": ["java", "-cp", "{binary_dir}", "Main"]
+    "win32": {
+      "javac": { "compile": ["javac", "-d", "{binary_dir}", "{source}"], "run": ["java", "-cp", "{binary_dir}", "Main"] }
+    },
+    "linux": {
+      "javac": { "compile": ["javac", "-d", "{binary_dir}", "{source}"], "run": ["java", "-cp", "{binary_dir}", "Main"] }
+    },
+    "darwin": {
+      "javac": { "compile": ["javac", "-d", "{binary_dir}", "{source}"], "run": ["java", "-cp", "{binary_dir}", "Main"] }
+    }
   },
   "go": {
-    "compile": ["go", "build", "-o", "{binary}", "{source}"],
-    "run": ["{binary}"]
+    "win32": {
+      "go": { "compile": ["go", "build", "-o", "{binary}.exe", "{source}"], "run": ["{binary}.exe"] }
+    },
+    "linux": {
+      "go": { "compile": ["go", "build", "-o", "{binary}", "{source}"], "run": ["{binary}"] }
+    },
+    "darwin": {
+      "go": { "compile": ["go", "build", "-o", "{binary}", "{source}"], "run": ["{binary}"] }
+    }
   },
   "js": {
-    "run": ["node", "{source}"]
+    "win32": {
+      "node": { "run": ["node", "{source}"] }
+    },
+    "linux": {
+      "node": { "run": ["node", "{source}"] }
+    },
+    "darwin": {
+      "node": { "run": ["node", "{source}"] }
+    }
   },
   "rs": {
-    "compile": ["rustc", "-O", "{source}", "-o", "{binary}"],
-    "run": ["{binary}"]
+    "win32": {
+      "rustc": { "compile": ["rustc", "-O", "{source}", "-o", "{binary}.exe"], "run": ["{binary}.exe"] }
+    },
+    "linux": {
+      "rustc": { "compile": ["rustc", "-O", "{source}", "-o", "{binary}"], "run": ["{binary}"] }
+    },
+    "darwin": {
+      "rustc": { "compile": ["rustc", "-O", "{source}", "-o", "{binary}"], "run": ["{binary}"] }
+    }
   },
   "cs": {
-    "compile": ["csc", "-optimize", "{source}", "-out:{binary}.exe"],
-    "run": ["{binary}.exe"]
+    "win32": {
+      "csc": { "compile": ["csc", "-optimize", "{source}", "-out:{binary}.exe"], "run": ["{binary}.exe"] },
+      "dotnet": { "run": ["dotnet", "run", "--project", "{source_dir}"] }
+    },
+    "linux": {
+      "mono": { "compile": ["mcs", "-optimize", "{source}", "-out:{binary}.exe"], "run": ["mono", "{binary}.exe"] },
+      "dotnet": { "run": ["dotnet", "run", "--project", "{source_dir}"] }
+    },
+    "darwin": {
+      "mono": { "compile": ["mcs", "-optimize", "{source}", "-out:{binary}.exe"], "run": ["mono", "{binary}.exe"] },
+      "dotnet": { "run": ["dotnet", "run", "--project", "{source_dir}"] }
+    }
   },
   "hs": {
-    "compile": ["ghc", "-O2", "{source}", "-o", "{binary}"],
-    "run": ["{binary}"]
+    "win32": {
+      "ghc": { "compile": ["ghc", "-O2", "{source}", "-o", "{binary}.exe"], "run": ["{binary}.exe"] }
+    },
+    "linux": {
+      "ghc": { "compile": ["ghc", "-O2", "{source}", "-o", "{binary}"], "run": ["{binary}"] }
+    },
+    "darwin": {
+      "ghc": { "compile": ["ghc", "-O2", "{source}", "-o", "{binary}"], "run": ["{binary}"] }
+    }
   },
   "kt": {
-    "compile": ["kotlinc", "{source}", "-include-runtime", "-d", "{binary}.jar"],
-    "run": ["java", "-jar", "{binary}.jar"]
+    "win32": {
+      "kotlinc": { "compile": ["kotlinc", "{source}", "-include-runtime", "-d", "{binary}.jar"], "run": ["java", "-jar", "{binary}.jar"] }
+    },
+    "linux": {
+      "kotlinc": { "compile": ["kotlinc", "{source}", "-include-runtime", "-d", "{binary}.jar"], "run": ["java", "-jar", "{binary}.jar"] }
+    },
+    "darwin": {
+      "kotlinc": { "compile": ["kotlinc", "{source}", "-include-runtime", "-d", "{binary}.jar"], "run": ["java", "-jar", "{binary}.jar"] }
+    }
   },
   "php": {
-    "run": ["php", "{source}"]
+    "win32": {
+      "php": { "run": ["php", "{source}"] }
+    },
+    "linux": {
+      "php": { "run": ["php", "{source}"] }
+    },
+    "darwin": {
+      "php": { "run": ["php", "{source}"] }
+    }
   },
   "rb": {
-    "run": ["ruby", "{source}"]
+    "win32": {
+      "ruby": { "run": ["ruby", "{source}"] }
+    },
+    "linux": {
+      "ruby": { "run": ["ruby", "{source}"] }
+    },
+    "darwin": {
+      "ruby": { "run": ["ruby", "{source}"] }
+    }
   }
 }

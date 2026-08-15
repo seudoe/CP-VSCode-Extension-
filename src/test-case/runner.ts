@@ -24,7 +24,29 @@ export async function getRunCommand(extension: string, extensionUriPath: string)
   
   try {
     const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    return data[ext] || null;
+    const langData = data[ext];
+    if (!langData) return null;
+    
+    let platformKey = process.platform === 'win32' ? 'win32' : (process.platform === 'darwin' ? 'darwin' : 'linux');
+    const platformData = langData[platformKey] || langData['linux'] || langData['win32'];
+    
+    if (!platformData) return null;
+
+    const config = vscode.workspace.getConfiguration('seuCF');
+    const compilers = config.get<Record<string, string>>('compilers') || {};
+    let compiler = compilers[ext];
+    
+    if (compiler && platformData[compiler]) {
+      return platformData[compiler];
+    }
+    
+    // Fallback to first available compiler for this platform
+    const fallbackCompiler = Object.keys(platformData)[0];
+    if (fallbackCompiler) {
+      return platformData[fallbackCompiler];
+    }
+
+    return null;
   } catch (e) {
     console.error('[seudoe] Failed to parse run-commands.json', e);
     return null;

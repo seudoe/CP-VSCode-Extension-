@@ -109,6 +109,24 @@
           "type": "object",
           "default": {},
           "description": "Custom boilerplate templates per language extension (e.g. \"cpp\"). Value can be an array of strings (lines of code) or a string starting with 'file:' (e.g. 'file:C:\\\\templates\\\\cpp.txt') to load from a file."
+        },
+        "seuCF.compilers": {
+          "type": "object",
+          "default": {
+            "cpp": "g++",
+            "c": "gcc",
+            "py": "python",
+            "java": "javac",
+            "go": "go",
+            "js": "node",
+            "rs": "rustc",
+            "cs": "csc",
+            "hs": "ghc",
+            "kt": "kotlinc",
+            "php": "php",
+            "rb": "ruby"
+          },
+          "description": "Preferred compilers or interpreters for each language. For example: {\"cpp\": \"g++\", \"py\": \"python3\"}."
         }
       }
     }
