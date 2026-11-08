@@ -146,6 +146,11 @@ export async function runTestCase(
       child.kill('SIGKILL');
     }, timeLimitMs);
 
+    if (input) {
+      child.stdin.write(input);
+    }
+    child.stdin.end();
+
     child.stdout.on('data', (data) => {
       stdoutData += data.toString();
     });

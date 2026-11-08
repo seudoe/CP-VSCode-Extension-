@@ -4,9 +4,10 @@ import { readRatingDb, buildRatingDb, sortedRatingKeys, RatingGroup, RATING_RANK
 import { readTagDb, buildTagDb, sortedTagKeys, TagGroup, OTHER_TAG_KEY } from './tag-db';
 import { readContestDb, ContestDB, ContestWithProblems } from './contest-db';
 import { CFProblem } from './cf-api';
-import { fetchProblem, fetchImage, closeDb, reportProblemError } from './db';
-import { renderProblem } from './renderer';
+import { fetchProblem, fetchImage, closeDb, reportProblemError, fetchCsesProblemsList, fetchCsesProblem } from './db';
+import { renderProblem, renderCsesProblem } from './renderer';
 import { getUserDetails, saveUserDetails, fetchUserStatus, UserDetails, initUserDb } from './user-db';
+import { CsesProblemSummary, CachedCsesProblem } from './types';
 
 // ── CF rank color map ────────────────────────────────────────────────────────
 // Source: https://gist.github.com/algon-320/4369c85b34cb4f76a7f843a5a803125b
@@ -38,6 +39,26 @@ export class RatingDecorationProvider implements vscode.FileDecorationProvider {
   }
 }
 
+export class CategoryDecorationProvider implements vscode.FileDecorationProvider {
+  provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
+    if (uri.scheme === 'category-cf') {
+      return {
+        badge: 'CF',
+        color: new vscode.ThemeColor('charts.blue'),
+        tooltip: 'Codeforces Section',
+      };
+    }
+    if (uri.scheme === 'category-cses') {
+      return {
+        badge: 'CS',
+        color: new vscode.ThemeColor('charts.green'),
+        tooltip: 'CSES Section',
+      };
+    }
+    return undefined;
+  }
+}
+
 function hexToChartColor(hex: string): string {
   switch (hex) {
     case '#008000': return 'green';
@@ -50,23 +71,86 @@ function hexToChartColor(hex: string): string {
   }
 }
 
+// ── Category Icon Generator with Distinct Background Colors ─────────────────
+
+function generateCategoryIcon(group: 'cf' | 'cses' | 'other', label: string, extensionUri: vscode.Uri): vscode.Uri {
+  const fs = require('fs') as typeof import('fs');
+  const folderPath = vscode.Uri.joinPath(extensionUri, 'media', 'categories');
+  const safeName = `${group}.svg`;
+  const filePath = vscode.Uri.joinPath(folderPath, safeName);
+
+  if (!fs.existsSync(folderPath.fsPath)) {
+    fs.mkdirSync(folderPath.fsPath, { recursive: true });
+  }
+
+  if (!fs.existsSync(filePath.fsPath)) {
+    const bgColor = group === 'cf' ? '#1f85de' : group === 'cses' ? '#10b981' : '#6b7280';
+    const text = group === 'cf' ? 'CF' : group === 'cses' ? 'CSES' : 'CP';
+    const width = group === 'cses' ? 36 : 28;
+    const x = width / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="18" viewBox="0 0 ${width} 18">
+      <rect width="${width}" height="18" rx="4" fill="${bgColor}"/>
+      <text x="${x}" y="13" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle">${text}</text>
+    </svg>`;
+    fs.writeFileSync(filePath.fsPath, svg, 'utf8');
+  }
+
+  return filePath;
+}
+
 // ── Tree item types ──────────────────────────────────────────────────────────
 
 const PROBLEM_CATEGORIES = [
+  // Codeforces Sections
   'All',
   'Rating',
   'Tag',
   'Favorite',
   'Past Contests',
   'Upcoming Contests',
+  // CSES Sections
   'CSES Problemset',
+  'CSES Categories',
+  // Future Sections
   'CP-31 Sheet',
   'A2OJ Ladders',
 ];
 
+const CF_CATEGORIES = new Set([
+  'All',
+  'Rating',
+  'Tag',
+  'Favorite',
+  'Favourite',
+  'Past Contests',
+  'Upcoming Contests',
+]);
+
+const CSES_CATEGORIES = new Set([
+  'CSES Problemset',
+  'CSES Categories',
+]);
+
 class ProblemCategoryItem extends vscode.TreeItem {
-  constructor(public readonly category: string) {
+  constructor(public readonly category: string, extensionUri: vscode.Uri) {
     super(category, vscode.TreeItemCollapsibleState.Collapsed);
+
+    if (CF_CATEGORIES.has(category)) {
+      this.iconPath = generateCategoryIcon('cf', category, extensionUri);
+      this.resourceUri = vscode.Uri.parse(`category-cf://${encodeURIComponent(category)}`);
+      this.description = 'Codeforces';
+      this.tooltip = `Codeforces: ${category}`;
+    } else if (CSES_CATEGORIES.has(category)) {
+      this.iconPath = generateCategoryIcon('cses', category, extensionUri);
+      this.resourceUri = vscode.Uri.parse(`category-cses://${encodeURIComponent(category)}`);
+      this.description = 'CSES';
+      this.tooltip = `CSES: ${category}`;
+    } else {
+      this.iconPath = generateCategoryIcon('other', category, extensionUri);
+      this.description = 'Coming soon';
+      this.tooltip = `${category} (Coming soon)`;
+    }
+
     if (category === 'All') {
       this.contextValue = 'problemCategoryAll';
     } else if (category === 'Past Contests') {
@@ -74,6 +158,37 @@ class ProblemCategoryItem extends vscode.TreeItem {
     } else {
       this.contextValue = 'problemCategory';
     }
+  }
+}
+
+class CsesProblemItem extends vscode.TreeItem {
+  constructor(public readonly problem: CsesProblemSummary, provider: ProblemsProvider) {
+    super(`[${problem.id}] ${problem.name}`, vscode.TreeItemCollapsibleState.None);
+
+    this.description = problem.solvedCount !== null && problem.solvedCount !== undefined
+      ? `✓ ${problem.solvedCount.toLocaleString()}`
+      : problem.category;
+
+    this.tooltip = `[${problem.id}] ${problem.name}\nCategory: ${problem.category}\nSolved: ${problem.solvedCount?.toLocaleString() ?? 'N/A'} / Attempts: ${problem.attemptCount?.toLocaleString() ?? 'N/A'}`;
+    this.contextValue = 'csesProblem';
+
+    this.iconPath = vscode.Uri.joinPath(provider.getExtensionUri(), 'media', 'empty.svg');
+
+    this.command = {
+      command: 'seudoe.openCsesProblem',
+      title: 'Open CSES Problem',
+      arguments: [problem],
+    };
+  }
+}
+
+class CsesCategoryBucketItem extends vscode.TreeItem {
+  constructor(public readonly category: string, count: number, extensionUri: vscode.Uri) {
+    super(category, vscode.TreeItemCollapsibleState.Collapsed);
+    this.description = `${count} problems`;
+    this.tooltip = `${count} problems in ${category}`;
+    this.contextValue = 'csesCategoryBucket';
+    this.iconPath = new vscode.ThemeIcon('folder', new vscode.ThemeColor('charts.green'));
   }
 }
 
@@ -207,6 +322,9 @@ export class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem
   private contestDb: ContestDB = { past: [], upcoming: [] };
   private userDetails: UserDetails | null = null;
 
+  private csesProblems: CsesProblemSummary[] = [];
+  private isLoadingCses: boolean = false;
+
   constructor(private context: vscode.ExtensionContext) {
     const db = readDb();
     this.allProblems = db.problems;
@@ -214,10 +332,39 @@ export class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem
     this.tagGroups = readTagDb();
     this.contestDb = readContestDb();
     this.userDetails = getUserDetails();
+    this.loadCsesProblems();
+  }
+
+  async loadCsesProblems(): Promise<void> {
+    if (this.isLoadingCses) { return; }
+    this.isLoadingCses = true;
+    try {
+      this.csesProblems = await fetchCsesProblemsList();
+    } catch (err) {
+      console.error('[seudoe] Failed to fetch CSES problems:', err);
+    } finally {
+      this.isLoadingCses = false;
+      this._onDidChangeTreeData.fire();
+    }
+  }
+
+  getCsesCategoryGroups(): Map<string, CsesProblemSummary[]> {
+    const map = new Map<string, CsesProblemSummary[]>();
+    for (const p of this.csesProblems) {
+      const cat = p.category || 'General';
+      if (!map.has(cat)) {
+        map.set(cat, []);
+      }
+      map.get(cat)!.push(p);
+    }
+    return map;
   }
 
   getUserDetails() { return this.userDetails; }
   getExtensionUri() { return this.context.extensionUri; }
+  getCsesProblems() { return this.csesProblems; }
+  getRatingGroups() { return this.ratingGroups; }
+  getTagGroups() { return this.tagGroups; }
 
   setUserDetails(details: UserDetails) {
     this.userDetails = details;
@@ -252,7 +399,7 @@ export class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem
   getChildren(element?: vscode.TreeItem): vscode.ProviderResult<vscode.TreeItem[]> {
     // Root — category list
     if (!element) {
-      return PROBLEM_CATEGORIES.map(c => new ProblemCategoryItem(c));
+      return PROBLEM_CATEGORIES.map(c => new ProblemCategoryItem(c, this.getExtensionUri()));
     }
 
     // All
@@ -324,6 +471,40 @@ export class ProblemsProvider implements vscode.TreeDataProvider<vscode.TreeItem
         return [new vscode.TreeItem('No problems indexed')];
       }
       return problems.map((p: CFProblem) => new ProblemItem(p, this));
+    }
+
+    // CSES Problemset — full list of 400 problems
+    if (element instanceof ProblemCategoryItem && element.category === 'CSES Problemset') {
+      if (this.csesProblems.length === 0) {
+        if (!this.isLoadingCses) {
+          this.loadCsesProblems();
+        }
+        const loading = new vscode.TreeItem('Loading CSES problems...');
+        loading.description = 'Fetching from MongoDB cses database';
+        return [loading];
+      }
+      return this.csesProblems.map(p => new CsesProblemItem(p, this));
+    }
+
+    // CSES Categories — list of categories with counts
+    if (element instanceof ProblemCategoryItem && element.category === 'CSES Categories') {
+      if (this.csesProblems.length === 0) {
+        if (!this.isLoadingCses) {
+          this.loadCsesProblems();
+        }
+        const loading = new vscode.TreeItem('Loading CSES categories...');
+        loading.description = 'Fetching from MongoDB cses database';
+        return [loading];
+      }
+      const catMap = this.getCsesCategoryGroups();
+      return Array.from(catMap.entries()).map(([cat, list]) => new CsesCategoryBucketItem(cat, list.length, this.getExtensionUri()));
+    }
+
+    // CSES Category Bucket — problems inside that specific category
+    if (element instanceof CsesCategoryBucketItem) {
+      const catMap = this.getCsesCategoryGroups();
+      const list = catMap.get(element.category) || [];
+      return list.map(p => new CsesProblemItem(p, this));
     }
 
     // Other categories — coming soon
@@ -436,7 +617,7 @@ export async function openProblemPanel(
       vscode.env.openExternal(vscode.Uri.parse(url));
     } else if (msg.type === 'codeNow') {
       const { getCodeNowSettings, resolveDirectory, generateFilename, getBoilerplate } = require('../settings/settings');
-      const settings = getCodeNowSettings();
+      const settings = getCodeNowSettings('codeforces');
       
       const exts = [
         '.cpp', '.py', '.java', '.c', '.cs', '.go', '.hs', '.kt', '.php', '.rb', '.rs', '.js'
@@ -603,9 +784,10 @@ function loadingHtml(id: string, name: string): string {
   </body></html>`;
 }
 
-function errorHtml(id: string, msg: string, contestId?: number, index?: string): string {
-  const browserBtn = contestId && index
-    ? `<br><br><a href="https://codeforces.com/problemset/problem/${contestId}/${index}" style="color:#4e9eff;text-decoration:none;border:1px solid #4e9eff;padding:6px 12px;border-radius:4px;display:inline-block">See the problem statement in default browser</a>`
+function errorHtml(id: string, msg: string, contestId?: number, index?: string, browserUrl?: string): string {
+  const targetUrl = browserUrl || (contestId && index ? `https://codeforces.com/problemset/problem/${contestId}/${index}` : '');
+  const browserBtn = targetUrl
+    ? `<br><br><a href="${targetUrl}" style="color:#4e9eff;text-decoration:none;border:1px solid #4e9eff;padding:6px 12px;border-radius:4px;display:inline-block">See the problem statement in default browser</a>`
     : '';
 
   return `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:32px;color:#f44">
@@ -619,4 +801,188 @@ function errorHtml(id: string, msg: string, contestId?: number, index?: string):
       document.getElementById('btn-code-now-error')?.addEventListener('click', () => vsApi.postMessage({ type: 'codeNow' }));
     </script>
   </body></html>`;
+}
+
+// ── CSES Webview Panel Manager ───────────────────────────────────────────────
+
+let currentCsesPanel: vscode.WebviewPanel | undefined;
+let currentCsesMessageListener: vscode.Disposable | undefined;
+
+export async function openCsesProblemPanel(
+  problem: CsesProblemSummary,
+  context: vscode.ExtensionContext
+): Promise<void> {
+  const id = problem.id;
+
+  if (currentCsesPanel) {
+    currentCsesPanel.reveal(vscode.ViewColumn.One);
+  } else {
+    currentCsesPanel = vscode.window.createWebviewPanel(
+      'csesProblem',
+      `[${id}] ${problem.name}`,
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        localResourceRoots: [
+          vscode.Uri.joinPath(context.extensionUri, 'media'),
+        ],
+      }
+    );
+    currentCsesPanel.onDidDispose(() => { currentCsesPanel = undefined; });
+  }
+
+  currentCsesPanel.title = `[${id}] ${problem.name}`;
+  currentCsesPanel.webview.html = loadingHtml(id, problem.name);
+
+  if (currentCsesMessageListener) {
+    currentCsesMessageListener.dispose();
+  }
+
+  currentCsesMessageListener = currentCsesPanel.webview.onDidReceiveMessage(async (msg) => {
+    if (msg.type === 'fetchImage') {
+      try {
+        const result = await fetchImage(msg.filename as string);
+        if (result && currentCsesPanel) {
+          const base64 = result.buffer.toString('base64');
+          currentCsesPanel.webview.postMessage({
+            type: 'imageData',
+            filename: msg.filename,
+            dataUri: `data:${result.contentType};base64,${base64}`,
+          });
+        }
+      } catch (err) {
+        console.error(`[seudoe] Failed to load CSES image ${msg.filename}:`, err);
+      }
+    } else if (msg.type === 'openBrowser') {
+      const url = problem.url || `https://cses.fi/problemset/task/${id}`;
+      vscode.env.openExternal(vscode.Uri.parse(url));
+    } else if (msg.type === 'codeNow') {
+      const { getCodeNowSettings, resolveDirectory, generateFilename, getBoilerplate } = require('../settings/settings');
+      const settings = getCodeNowSettings('cses');
+
+      const exts = [
+        '.cpp', '.py', '.java', '.c', '.cs', '.go', '.hs', '.kt', '.php', '.rb', '.rs', '.js'
+      ];
+
+      let selectedExt = settings.extension;
+      if (!selectedExt || !exts.includes(selectedExt)) {
+        selectedExt = await vscode.window.showQuickPick(exts, { placeHolder: 'Select language extension' });
+      }
+
+      if (selectedExt) {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+          vscode.window.showErrorMessage('Please open a workspace folder first to create code files.');
+          return;
+        }
+
+        const path = require('path');
+        const fs = require('fs');
+        const rootPath = workspaceFolders[0].uri.fsPath;
+        const targetDir = resolveDirectory(settings.directory, rootPath);
+
+        try {
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+        } catch (err) {
+          vscode.window.showErrorMessage(`Failed to create directory '${targetDir}': ${err}`);
+          return;
+        }
+
+        const safeProblemName = problem.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = generateFilename(settings.filename, {
+          problemId: id,
+          contestId: 'cses',
+          problemIndex: id,
+          problemName: safeProblemName,
+          fileExtension: selectedExt
+        });
+
+        const filePath = vscode.Uri.file(path.join(targetDir, filename));
+
+        try {
+          if (!fs.existsSync(filePath.fsPath)) {
+            const boilerplateStr = getBoilerplate(selectedExt, rootPath, context.extensionUri.fsPath);
+            fs.writeFileSync(filePath.fsPath, boilerplateStr, 'utf8');
+          }
+
+          const seutestDir = path.join(targetDir, '.seutest');
+          const basenameWithoutExt = path.basename(filePath.fsPath, path.extname(filePath.fsPath));
+          const seudoeFilePath = path.join(seutestDir, `${basenameWithoutExt}.seudoe`);
+
+          if (!fs.existsSync(seutestDir)) {
+            fs.mkdirSync(seutestDir, { recursive: true });
+          }
+
+          const cached = await fetchCsesProblem(id);
+          let testsArray: any[] = [];
+
+          if (cached?.statement?.examples) {
+            testsArray = cached.statement.examples.map((ex: any, i: number) => ({
+              id: Date.now() + i,
+              input: ex.input || '',
+              output: '',
+              answer: ex.output || '',
+            }));
+          }
+
+          let finalSeudoeData: any = {
+            name: `${id} - ${problem.name}`,
+            url: problem.url || `https://cses.fi/problemset/task/${id}`,
+            tests: testsArray,
+            interactive: cached?.statement?.isInteractive || false,
+            memoryLimit: cached?.statement?.memoryLimit ? parseInt(cached.statement.memoryLimit as any) : 512,
+            timeLimit: cached?.statement?.timeLimit ? parseFloat(cached.statement.timeLimit as any) * 1000 : 1000,
+            srcPath: filePath.fsPath,
+            group: 'CSES',
+            local: true,
+          };
+
+          if (fs.existsSync(seudoeFilePath)) {
+            try {
+              const existingData = JSON.parse(fs.readFileSync(seudoeFilePath, 'utf8'));
+              if (existingData.tests && Array.isArray(existingData.tests)) {
+                finalSeudoeData = { ...existingData, tests: existingData.tests };
+              }
+            } catch (e) {
+              console.error('Failed to parse existing .seudoe file for merging', e);
+            }
+          }
+
+          fs.writeFileSync(seudoeFilePath, JSON.stringify(finalSeudoeData, null, 2), 'utf8');
+
+          const doc = await vscode.workspace.openTextDocument(filePath);
+          await vscode.window.showTextDocument(doc);
+          vscode.commands.executeCommand('seudoe.testCasesView.focus');
+        } catch (err) {
+          vscode.window.showErrorMessage(`Failed to create file or testcases: ${err}`);
+        }
+      }
+    }
+  });
+
+  try {
+    const cached = await fetchCsesProblem(id);
+    if (!cached) {
+      if (currentCsesPanel) {
+        currentCsesPanel.webview.html = errorHtml(
+          id,
+          `Problem ${id} not found in CSES database.\n\nPlease verify that the scraper has run into database 'cses'.`,
+          undefined,
+          undefined,
+          problem.url
+        );
+      }
+      return;
+    }
+    if (currentCsesPanel) {
+      currentCsesPanel.webview.html = renderCsesProblem(cached, problem, currentCsesPanel.webview, context.extensionUri);
+    }
+  } catch (err) {
+    console.error(`[seudoe] MongoDB fetch failed for CSES problem ${id}:`, err);
+    if (currentCsesPanel) {
+      currentCsesPanel.webview.html = errorHtml(id, String(err), undefined, undefined, problem.url);
+    }
+  }
 }

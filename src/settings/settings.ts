@@ -8,11 +8,26 @@ export interface CodeNowSettings {
   filename: string;
 }
 
-export function getCodeNowSettings(): CodeNowSettings {
+export function getCodeNowSettings(platform: 'codeforces' | 'cses' = 'codeforces'): CodeNowSettings {
   const config = vscode.workspace.getConfiguration('seuCF');
-  const dir = config.get<string>('fileCreationDirectory') || '';
+  
+  let dir = '';
+  let filename = '{problemId}-{problemName}{fileExtension}';
+
+  if (platform === 'cses') {
+    dir = config.get<string>('csesFileCreationDirectory') || '';
+    filename = config.get<string>('csesFileName') || '{problemId}-{problemName}{fileExtension}';
+  } else {
+    // Codeforces with fallback to previous keys for backwards compatibility
+    dir = config.get<string>('codeforcesFileCreationDirectory')
+       || config.get<string>('fileCreationDirectory')
+       || '';
+    filename = config.get<string>('codeforcesFileName')
+            || config.get<string>('fileName')
+            || '{problemId}-{problemName}{fileExtension}';
+  }
+
   let ext: string | undefined = config.get<string>('defaultFileExtension') || 'Select everytime';
-  const filename = config.get<string>('fileName') || '{problemId}-{problemName}{fileExtension}';
 
   if (ext === 'Select everytime' || ext === '') {
     ext = undefined;

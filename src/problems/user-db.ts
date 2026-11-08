@@ -49,10 +49,11 @@ function fetchJson(url: string): Promise<any> {
       }
     };
     https.get(url, options, (res) => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => { chunks.push(chunk); });
       res.on('end', () => {
         try {
+          const data = Buffer.concat(chunks).toString('utf-8');
           const parsed = JSON.parse(data);
           if (parsed.status !== 'OK') {
             return reject(new Error(parsed.comment || `Failed to fetch from ${url}`));

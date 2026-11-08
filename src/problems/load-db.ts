@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { CFProblem, fetchAllProblems } from './cf-api';
-import { initRatingDb, buildRatingDb } from './rating-db';
-import { initTagDb, buildTagDb } from './tag-db';
+import { initRatingDb, buildRatingDb, readRatingDb } from './rating-db';
+import { initTagDb, buildTagDb, readTagDb } from './tag-db';
 import { initContestDb, buildContestDb, ensureContestDb, ContestDB } from './contest-db';
 
 export interface ProblemDB {
@@ -73,8 +73,14 @@ export async function refreshDb(): Promise<{ problems: CFProblem[]; contests: Co
 export async function ensureDerivedDbs(): Promise<ContestDB> {
   const db = readDb();
   if (db.problems.length > 0) {
-    buildRatingDb(db.problems);
-    buildTagDb(db.problems);
+    const existingRatings = readRatingDb();
+    if (Object.keys(existingRatings).length === 0) {
+      buildRatingDb(db.problems);
+    }
+    const existingTags = readTagDb();
+    if (Object.keys(existingTags).length === 0) {
+      buildTagDb(db.problems);
+    }
     return ensureContestDb(db.problems);
   }
   return { past: [], upcoming: [] };

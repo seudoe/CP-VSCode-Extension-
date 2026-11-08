@@ -29,8 +29,14 @@ The ultimate all-in-one Codeforces companion directly inside Visual Studio Code.
 
 Customize the extension to match your exact workflow. Access these through VS Code Settings by searching for `seuCF`.
 
-- `seuCF.fileCreationDirectory`: Set an absolute or workspace-relative path where 'Code Now' will save your generated problem files.
-- `seuCF.fileName`: Customize the template for naming generated files. (Placeholders include `{problemId}`, `{problemName}`, `{contestId}`, `{problemIndex}`, `{fileExtension}`).
+- `seuCF.codeforcesFileCreationDirectory`: Set an absolute or workspace-relative path where 'Code Now' will save your generated Codeforces problem files.
+- `seuCF.codeforcesFileName`: Customize the template for naming generated Codeforces files. (Placeholders include `{problemId}`, `{problemName}`, `{contestId}`, `{problemIndex}`, `{fileExtension}`).
+- `seuCF.codeforcesUsername`: Codeforces handle / username to track solved submissions and user status.
+- `seuCF.codeforcesCookiePath`: Path to Brave/Chrome cookies file or directory for Codeforces authentication/scraper.
+- `seuCF.csesFileCreationDirectory`: Set an absolute or workspace-relative path where 'Code Now' will save your generated CSES problem files.
+- `seuCF.csesFileName`: Customize the template for naming generated CSES files. (Placeholders include `{problemId}`, `{problemName}`, `{fileExtension}`).
+- `seuCF.csesUsername`: CSES username / email for login and submissions.
+- `seuCF.csesCookiePath`: Path to CSES cookie file or directory for authentication.
 - `seuCF.defaultFileExtension`: Set your default programming language extension (e.g. `.cpp`, `.py`) or leave it as "Select everytime" to be prompted.
 - `seuCF.boilerplateCodes`: Define your custom boilerplate templates per language. You can write an array of strings or load from an absolute file path using the `file:` prefix (e.g., `"cpp": "file:C:\\templates\\cpp.txt"`).
 - `seuCF.compilers`: Set your preferred compilers or interpreters for each language. (e.g., `{"cpp": "clang++", "py": "python3"}`).

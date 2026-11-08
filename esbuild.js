@@ -30,7 +30,7 @@ try {
 	const envLocal = fs.readFileSync('.env.local', 'utf8');
 	envLocal.split('\n').forEach(line => {
 		if (line.trim().startsWith('MONGODB_URI=')) {
-			mongoUri = line.split('=')[1].trim();
+			mongoUri = line.trim().substring('MONGODB_URI='.length).trim();
 		}
 	});
 } catch (e) {
@@ -50,7 +50,7 @@ async function main() {
 		sourcesContent: false,
 		platform: 'node',
 		outfile: 'dist/extension.js',
-		external: ['vscode', 'mongodb'],
+		external: ['vscode'],
 		logLevel: 'silent',
 		plugins: [
 			/* add to the end of plugins array */

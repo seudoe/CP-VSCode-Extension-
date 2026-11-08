@@ -1,8 +1,8 @@
 {
   "name": "seudoe",
-  "displayName": "Seudoe Competitive Programming",
+  "displayName": "Competitive Programmer Seudoe",
   "description": "All around CodeForces Extension",
-  "version": "0.0.2",
+  "version": "0.0.8",
   "publisher": "seudoe",
   "repository": {
     "type": "git",
@@ -77,6 +77,7 @@
     "views": {
       "seudoe-problems": [
         {
+          "type": "webview",
           "id": "seudoe.problemsView",
           "name": "Problems",
           "icon": "media/problems.svg"
@@ -94,10 +95,45 @@
     "configuration": {
       "title": "Competitive Programming",
       "properties": {
-        "seuCF.fileCreationDirectory": {
+        "seuCF.codeforcesFileCreationDirectory": {
           "type": "string",
           "default": "",
-          "description": "Directory where 'Code Now' creates files. If it starts with a disk letter (e.g., C:\\) or a forward slash (/), it is treated as an absolute path. Otherwise, it is treated as relative to the current workspace root. Leave empty to use the workspace root."
+          "description": "Directory where 'Code Now' creates files for Codeforces problems. If it starts with a disk letter (e.g., C:\\) or a forward slash (/), it is treated as an absolute path. Otherwise, it is treated as relative to the current workspace root. Leave empty to use the workspace root."
+        },
+        "seuCF.codeforcesFileName": {
+          "type": "string",
+          "default": "{problemId}-{problemName}{fileExtension}",
+          "description": "Template for naming generated Codeforces files. Available placeholders: {problemId}, {problemName}, {contestId}, {problemIndex}, {fileExtension}."
+        },
+        "seuCF.codeforcesUsername": {
+          "type": "string",
+          "default": "",
+          "description": "Codeforces handle / username to track solved submissions and user status."
+        },
+        "seuCF.codeforcesCookiePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Brave/Chrome cookies file or directory for Codeforces authentication/scraper."
+        },
+        "seuCF.csesFileCreationDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Directory where 'Code Now' creates files for CSES problems. If it starts with a disk letter (e.g., C:\\) or a forward slash (/), it is treated as an absolute path. Otherwise, it is treated as relative to the current workspace root. Leave empty to use the workspace root."
+        },
+        "seuCF.csesFileName": {
+          "type": "string",
+          "default": "{problemId}-{problemName}{fileExtension}",
+          "description": "Template for naming generated CSES files. Available placeholders: {problemId}, {problemName}, {fileExtension}."
+        },
+        "seuCF.csesUsername": {
+          "type": "string",
+          "default": "",
+          "description": "CSES username / email for login and submissions."
+        },
+        "seuCF.csesCookiePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to CSES cookie file or directory for authentication."
         },
         "seuCF.defaultFileExtension": {
           "type": "string",
@@ -118,11 +154,6 @@
             ".js"
           ],
           "description": "Default file extension used for the 'Code Now' button. Set to 'Select everytime' to manually choose the language on each click."
-        },
-        "seuCF.fileName": {
-          "type": "string",
-          "default": "{problemId}-{problemName}{fileExtension}",
-          "description": "Template for naming generated files. Available placeholders: {problemId}, {problemName}, {contestId}, {problemIndex}, {fileExtension}."
         },
         "seuCF.boilerplateCodes": {
           "type": "object",

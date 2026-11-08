@@ -44,10 +44,11 @@ export function fetchAllProblems(): Promise<CFProblem[]> {
 
     https
       .get(url, (res) => {
-        let raw = '';
-        res.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => { chunks.push(chunk); });
         res.on('end', () => {
           try {
+            const raw = Buffer.concat(chunks).toString('utf-8');
             const parsed: CFApiResponse = JSON.parse(raw);
             if (parsed.status !== 'OK') {
               reject(new Error(`CF API returned status: ${parsed.status}`));
@@ -76,10 +77,11 @@ export function fetchContests(): Promise<CFContest[]> {
 
     https
       .get(url, (res) => {
-        let raw = '';
-        res.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => { chunks.push(chunk); });
         res.on('end', () => {
           try {
+            const raw = Buffer.concat(chunks).toString('utf-8');
             const parsed: CFContestListResponse = JSON.parse(raw);
             if (parsed.status !== 'OK') {
               reject(new Error(`CF API returned status: ${parsed.status}`));

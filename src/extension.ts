@@ -5,8 +5,10 @@ import { closeDb } from './problems/db';
 import { saveUserDetails, fetchUserStatus, initUserDb } from './problems/user-db';
 import { ContestWithProblems } from './problems/contest-db';
 
-import { ProblemsProvider, RatingDecorationProvider, openProblemPanel } from './problems/problems-view';
+import { ProblemsProvider, RatingDecorationProvider, CategoryDecorationProvider, openProblemPanel, openCsesProblemPanel } from './problems/problems-view';
+import { ProblemsViewProvider } from './problems/problems-view-provider';
 import { TestCasesViewProvider } from './test-case/testcases-view';
+import { CsesProblemSummary } from './problems/types';
 
 // ── Activation ───────────────────────────────────────────────────────────────
 
@@ -19,11 +21,10 @@ export function activate(context: vscode.ExtensionContext) {
   initUserDb(dbStoragePath);
 
   const problemsProvider = new ProblemsProvider(context);
-  const problemsTreeView = vscode.window.createTreeView('seudoe.problemsView', {
-    treeDataProvider: problemsProvider,
-    showCollapseAll: true
-  });
-  context.subscriptions.push(problemsTreeView);
+  const problemsViewProvider = new ProblemsViewProvider(context, problemsProvider);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ProblemsViewProvider.viewType, problemsViewProvider)
+  );
   
   const testCasesProvider = new TestCasesViewProvider(context.extensionUri);
   context.subscriptions.push(
@@ -33,11 +34,21 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerFileDecorationProvider(new RatingDecorationProvider())
   );
+  context.subscriptions.push(
+    vscode.window.registerFileDecorationProvider(new CategoryDecorationProvider())
+  );
 
   // Open problem on click
   context.subscriptions.push(
     vscode.commands.registerCommand('seudoe.openProblem', (problem: CFProblem) => {
       openProblemPanel(problem, context);
+    })
+  );
+
+  // Open CSES problem on click
+  context.subscriptions.push(
+    vscode.commands.registerCommand('seudoe.openCsesProblem', (problem: CsesProblemSummary) => {
+      openCsesProblemPanel(problem, context);
     })
   );
 
@@ -59,6 +70,8 @@ export function activate(context: vscode.ExtensionContext) {
           const details = await fetchUserStatus(handle);
           saveUserDetails(details);
           problemsProvider.setUserDetails(details);
+          problemsViewProvider.sendMetadata();
+          problemsViewProvider.sendSettings();
           vscode.window.showInformationMessage(`Successfully loaded submission status for ${handle}!`);
         } catch (err: any) {
           vscode.window.showErrorMessage(`Failed to load user: ${err.message}`);
@@ -195,21 +208,21 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function syncProblems(provider: ProblemsProvider): Promise<void> {
-  if (isUpToDate()) {
-    console.log('[seudoe] Problems DB is up to date, skipping problems API call.');
-    // Still ensure contests are loaded (fetched once if missing)
-    const contests = await ensureDerivedDbs();
-    provider.setContestDb(contests);
-    return;
-  }
-
-  console.log('[seudoe] Fetching problems + contests from Codeforces API...');
   try {
+    if (isUpToDate()) {
+      console.log('[seudoe] Problems DB is up to date, skipping problems API call.');
+      // Still ensure contests are loaded (fetched once if missing)
+      const contests = await ensureDerivedDbs();
+      provider.setContestDb(contests);
+      return;
+    }
+
+    console.log('[seudoe] Fetching problems + contests from Codeforces API...');
     const { problems, contests } = await refreshDb();
     provider.refresh(problems, contests);
     console.log(`[seudoe] Loaded ${problems.length} problems, ${contests.past.length} past contests, ${contests.upcoming.length} upcoming.`);
   } catch (err) {
-    console.error('[seudoe] Failed to fetch data:', err);
+    console.error('[seudoe] Failed to fetch or ensure data:', err);
   }
 }
 

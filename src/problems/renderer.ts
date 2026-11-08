@@ -12,7 +12,7 @@
 
 import * as vscode from 'vscode';
 import katex from 'katex';
-import { CachedProblem, Block, Example } from './types';
+import { CachedProblem, Block, Example, CachedCsesProblem, CsesProblemSummary } from './types';
 import { CFProblem } from './cf-api';
 
 // ── HTML helpers ──────────────────────────────────────────────────────────────
@@ -94,6 +94,14 @@ function blockToHtml(block: Block): string {
           return renderMathInText('$' + tex + '$');
         });
 
+        // Convert KaTeX math spans (e.g. from CSES) to standard KaTeX blocks
+        cleanHtml = cleanHtml.replace(/<span[^>]*class="[^"]*math-display[^"]*"[^>]*>([\s\S]*?)<\/span>/g, (_, tex) => {
+          return renderMathInText('$$' + tex + '$$');
+        });
+        cleanHtml = cleanHtml.replace(/<span[^>]*class="[^"]*math-inline[^"]*"[^>]*>([\s\S]*?)<\/span>/g, (_, tex) => {
+          return renderMathInText('$' + tex + '$');
+        });
+
         // Any leftover script tags are errors
         cleanHtml = cleanHtml.replace(/<script[^>]*>([\s\S]*?)<\/script>/g, (_, latex) => `<span class="math-error">${esc(latex)}</span>`);
         
@@ -101,7 +109,7 @@ function blockToHtml(block: Block): string {
       }
 
       // Fallback to text if HTML isn't available
-      if (block.text != null && block.text !== '') {
+      if (block.text !== null && block.text !== undefined && block.text !== '') {
         return `<p>${renderMathInText(block.text)}</p>`;
       }
 
@@ -112,7 +120,7 @@ function blockToHtml(block: Block): string {
       return `<pre><code>${esc(block.code)}</code></pre>`;
 
     case 'image': {
-      const filename = block.src.replace('cf-image://', '');
+      const filename = block.src.replace('cf-image://', '').replace('cses-image://', '');
       return `<img data-cf-image="${esc(filename)}" src="" alt="${esc(block.alt ?? '')}" loading="lazy">`;
     }
 
@@ -121,8 +129,11 @@ function blockToHtml(block: Block): string {
 
     case 'list': {
       const tag = block.ordered ? 'ol' : 'ul';
-      const items = block.items
-        .map(item => `<li>${renderMathInText(item)}</li>`)
+      const items = (block.items as any[])
+        .map(item => {
+          const str = typeof item === 'string' ? item : (item.text || item.html || '');
+          return `<li>${renderMathInText(str)}</li>`;
+        })
         .join('');
       return `<${tag}>${items}</${tag}>`;
     }
@@ -601,6 +612,295 @@ ${noteHtml ? `
   } catch (e) {
     console.error('Failed to dump debug.html', e);
   }
+
+  return html;
+}
+
+export function renderCsesProblem(
+  cached: CachedCsesProblem,
+  meta: CsesProblemSummary | undefined,
+  _webview: vscode.Webview,
+  _extensionUri: vscode.Uri
+): string {
+  const { statement } = cached;
+  const id = cached.id;
+  const title = statement.title || cached.name;
+  const category = cached.category || meta?.category || 'General';
+
+  const descHtml = blocksToHtml(statement.description || []);
+  const inputHtml = statement.input?.length ? blocksToHtml(statement.input) : '';
+  const outputHtml = statement.output?.length ? blocksToHtml(statement.output) : '';
+  const constraintsHtml = statement.constraints?.length ? blocksToHtml(statement.constraints) : '';
+  const interactionHtml = statement.interaction?.length ? blocksToHtml(statement.interaction) : '';
+  const noteHtml = statement.note?.length ? blocksToHtml(statement.note) : '';
+  const examplesHtml = renderExamples(statement.examples || []);
+
+  const nonce = Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 16).toString(16)
+  ).join('');
+
+  const cssUri = _webview.asWebviewUri(vscode.Uri.joinPath(_extensionUri, 'media', 'katex.min.css')).toString();
+
+  const html = /* html */`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+content="default-src 'none';
+style-src 'nonce-${nonce}' ${_webview.cspSource} 'unsafe-inline';
+font-src ${_webview.cspSource} data:;
+img-src data: https: ${_webview.cspSource};
+script-src 'nonce-${nonce}';">
+<title>[${id}] ${esc(title)}</title>
+
+<link rel="stylesheet" href="${cssUri}">
+
+<style nonce="${nonce}">
+.katex { line-height: 1.2; }
+.katex, .katex * { box-sizing: content-box; }
+
+/* ── Tokens ── */
+:root {
+  --bg:       var(--vscode-editor-background);
+  --fg:       var(--vscode-editor-foreground);
+  --muted:    var(--vscode-descriptionForeground, #888);
+  --border:   var(--vscode-panel-border, #3a3a3a);
+  --accent:   #10b981;
+  --card:     var(--vscode-sideBar-background, #1c1c1c);
+  --pre-bg:   var(--vscode-textBlockQuote-background, #232323);
+  --tag-bg:   rgba(16, 185, 129, 0.15);
+  --tag-fg:   #34d399;
+  --r:        6px;
+}
+
+* { margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--fg);
+  background: var(--bg);
+  padding: 30px 40px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+}
+.contest-name {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+}
+.prob-title { font-size: 23px; font-weight: 700; line-height: 1.3; }
+
+/* ── Meta pills ── */
+.meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 13px; color: var(--muted);
+}
+.pill strong { color: var(--fg); font-weight: 600; }
+.pill-cat {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+}
+.pill-cat strong { color: #10b981; }
+
+/* ── Sections ── */
+.section { margin: 28px 0; }
+.sec-title {
+  font-size: 12px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted);
+  padding-bottom: 7px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Text / paragraphs ── */
+p { margin: 10px 0; font-size: 15px; }
+
+/* ── Code / pre ── */
+pre, code { font-family: "Consolas","Menlo","Courier New",monospace; }
+code {
+  background: var(--pre-bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 5px; font-size: .88em;
+}
+pre {
+  background: var(--pre-bg); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px 14px;
+  overflow-x: auto; font-size: 13.5px; line-height: 1.5;
+  margin: 10px 0;
+}
+pre code { background: none; border: none; padding: 0; }
+
+/* ── Lists ── */
+ul, ol { margin: 10px 0 10px 22px; font-size: 15px; }
+li { margin: 4px 0; }
+
+/* ── Images ── */
+img {
+  max-width: 100%; height: auto;
+  border-radius: var(--r); border: 1px solid var(--border);
+  display: block; margin: 14px 0;
+}
+
+/* ── Examples ── */
+.example {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r); margin-bottom: 16px; overflow: hidden;
+}
+.example-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; background: rgba(255,255,255,.03);
+  border-bottom: 1px solid var(--border);
+}
+.example-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.io-block { padding: 12px 14px; }
+.io-block + .io-block { border-top: 1px solid var(--border); }
+.io-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.io-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+.io-pre {
+  margin: 0 !important; background: var(--bg) !important;
+  font-size: 13px !important; white-space: pre-wrap; word-break: break-all;
+}
+.example-note {
+  padding: 10px 14px; font-size: 13.5px; color: var(--muted);
+  border-top: 1px solid var(--border); background: rgba(0,0,0,.15);
+}
+
+/* ── Copy button ── */
+.copy-btn {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--muted); border-radius: 4px; padding: 2px 8px;
+  font-size: 11px; cursor: pointer;
+}
+.copy-btn:hover { color: var(--fg); border-color: var(--fg); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="contest-name">CSES Problem Set &bull; ${esc(category)}</div>
+  <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+    <h1 class="prob-title">[${id}] ${esc(title)}</h1>
+    <button class="copy-btn" id="btn-browser-top" style="padding: 6px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+      <span>View on CSES</span> &#8599;
+    </button>
+  </div>
+
+  <div class="meta-row">
+    <span class="pill pill-cat"><strong>${esc(category)}</strong></span>
+    <span class="pill"><span>&#9201;</span><strong>${esc(statement.timeLimit || '1.00 s')}</strong></span>
+    <span class="pill"><span>&#128190;</span><strong>${esc(statement.memoryLimit || '512 MB')}</strong></span>
+    ${cached.solvedCount ? `<span class="pill"><span>&#10003;</span><strong>${cached.solvedCount.toLocaleString()}</strong><span style="opacity:.6;font-size:11px;margin-left:3px">solved</span></span>` : ''}
+    <button class="copy-btn" id="btn-code-now-top" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: bold; border: none; padding: 6px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; margin-left: auto; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">Code Now</button>
+  </div>
+</div>
+
+<!-- Statement -->
+<div class="section">${descHtml}</div>
+
+${inputHtml ? `
+<div class="section">
+  <div class="sec-title">Input</div>
+  ${inputHtml}
+</div>` : ''}
+
+${outputHtml ? `
+<div class="section">
+  <div class="sec-title">Output</div>
+  ${outputHtml}
+</div>` : ''}
+
+${interactionHtml ? `
+<div class="section">
+  <div class="sec-title">Interaction</div>
+  ${interactionHtml}
+</div>` : ''}
+
+${constraintsHtml ? `
+<div class="section">
+  <div class="sec-title">Constraints</div>
+  ${constraintsHtml}
+</div>` : ''}
+
+${examplesHtml ? `
+<div class="section">
+  <div class="sec-title">Examples</div>
+  ${examplesHtml}
+</div>` : ''}
+
+<div class="section" style="display: flex; justify-content: flex-end; margin-top: -10px; margin-bottom: 20px;">
+  <button class="btn" id="btn-code-now-bottom" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">Code Now</button>
+</div>
+
+${noteHtml ? `
+<div class="section">
+  <div class="sec-title">Note</div>
+  ${noteHtml}
+</div>` : ''}
+
+<hr style="border: 0; height: 1px; background: var(--border); margin: 40px 0 20px;">
+<div class="section" style="padding-top: 0; margin-top: 0;">
+  <div style="display: flex; gap: 10px;">
+    <button class="copy-btn" id="btn-browser-bottom">View on CSES</button>
+  </div>
+</div>
+
+<script nonce="${nonce}">
+  const vsApi = acquireVsCodeApi();
+
+  // Copy
+  function doCopy(btn, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+  }
+  document.querySelectorAll('.copy-btn[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-copy') || '';
+      doCopy(btn, text);
+    });
+  });
+
+  // Images via postMessage
+  document.querySelectorAll('img[data-cf-image]').forEach(img => {
+    const fn = img.getAttribute('data-cf-image');
+    if (fn) vsApi.postMessage({ type: 'fetchImage', filename: fn });
+  });
+
+  window.addEventListener('message', e => {
+    const m = e.data;
+    if (m.type === 'imageData') {
+      document.querySelectorAll('img[data-cf-image="' + m.filename + '"]')
+        .forEach(img => { img.src = m.dataUri; });
+    }
+  });
+
+  const openBrowser = () => vsApi.postMessage({ type: 'openBrowser' });
+  document.getElementById('btn-browser-top')?.addEventListener('click', openBrowser);
+  document.getElementById('btn-browser-bottom')?.addEventListener('click', openBrowser);
+
+  const doCodeNow = () => vsApi.postMessage({ type: 'codeNow' });
+  document.getElementById('btn-code-now-top')?.addEventListener('click', doCodeNow);
+  document.getElementById('btn-code-now-bottom')?.addEventListener('click', doCodeNow);
+</script>
+
+</body>
+</html>`;
 
   return html;
 }

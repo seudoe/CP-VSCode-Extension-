@@ -13,7 +13,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { MongoClient, Db, Binary } from 'mongodb';
-import { CachedProblem } from './types';
+import { CachedProblem, CsesProblemSummary, CachedCsesProblem } from './types';
 
 // ── Load MONGODB_URI from .env.local ─────────────────────────────────────────
 
@@ -57,9 +57,11 @@ function loadMongoUri(): string {
 
 let _client: MongoClient | null = null;
 let _db: Db | null = null;
+let _csesDb: Db | null = null;
+let _csesProblemsCache: CsesProblemSummary[] | null = null;
 
-async function getDb(): Promise<Db> {
-  if (_db) { return _db; }
+async function getClient(): Promise<MongoClient> {
+  if (_client) { return _client; }
 
   const uri = loadMongoUri();
   _client = new MongoClient(uri, {
@@ -68,15 +70,29 @@ async function getDb(): Promise<Db> {
   });
 
   await _client.connect();
-  _db = _client.db('codeforces');
+  return _client;
+}
+
+async function getDb(): Promise<Db> {
+  if (_db) { return _db; }
+  const client = await getClient();
+  _db = client.db('codeforces');
   console.log('[seudoe/db] Connected to MongoDB Atlas (codeforces)');
   return _db;
+}
+
+async function getCsesDb(): Promise<Db> {
+  if (_csesDb) { return _csesDb; }
+  const client = await getClient();
+  _csesDb = client.db('cses');
+  console.log('[seudoe/db] Connected to MongoDB Atlas (cses)');
+  return _csesDb;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Fetch a problem statement from MongoDB.
+ * Fetch a problem statement from MongoDB (Codeforces).
  * Returns null if not found.
  */
 export async function fetchProblem(contestId: number, index: string): Promise<CachedProblem | null> {
@@ -89,6 +105,72 @@ export async function fetchProblem(contestId: number, index: string): Promise<Ca
   );
 
   return doc as CachedProblem | null;
+}
+
+/**
+ * Fetch all CSES problems metadata from MongoDB (database: cses, collection: problems).
+ * Returns array of CsesProblemSummary, sorted by taskId.
+ */
+export async function fetchCsesProblemsList(forceRefresh: boolean = false): Promise<CsesProblemSummary[]> {
+  if (_csesProblemsCache && !forceRefresh) {
+    return _csesProblemsCache;
+  }
+
+  try {
+    const db = await getCsesDb();
+    const col = db.collection('problems');
+    const docs = await col.find(
+      {},
+      {
+        projection: {
+          _id: 0,
+          id: 1,
+          taskId: 1,
+          name: 1,
+          category: 1,
+          solvedCount: 1,
+          attemptCount: 1,
+          url: 1,
+        },
+      }
+    ).toArray();
+
+    const problems: CsesProblemSummary[] = docs.map((d: any) => ({
+      id: String(d.id || d.taskId),
+      taskId: Number(d.taskId || d.id),
+      name: String(d.name || ''),
+      category: String(d.category || 'General'),
+      solvedCount: d.solvedCount ?? null,
+      attemptCount: d.attemptCount ?? null,
+      url: d.url || `https://cses.fi/problemset/task/${d.id || d.taskId}`,
+      isCses: true as const,
+    }));
+
+    problems.sort((a, b) => a.taskId - b.taskId);
+    _csesProblemsCache = problems;
+    return problems;
+  } catch (err) {
+    console.error('[seudoe/db] Failed to fetch CSES problems list:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch a full CSES problem statement from MongoDB.
+ * Returns null if not found.
+ */
+export async function fetchCsesProblem(taskId: string | number): Promise<CachedCsesProblem | null> {
+  const db = await getCsesDb();
+  const col = db.collection('problems');
+  const idStr = String(taskId);
+  const idNum = Number(taskId);
+
+  const doc = await col.findOne(
+    { $or: [{ id: idStr }, { taskId: idNum }] },
+    { projection: { _id: 0 } }
+  );
+
+  return doc as CachedCsesProblem | null;
 }
 
 /**
@@ -109,18 +191,31 @@ export async function fetchScrapedIndex(): Promise<string[]> {
 
 /**
  * Fetch a raw image buffer + content type from MongoDB.
+ * Checks Codeforces images first, then CSES images.
  * Returns null if the image is not found.
  */
 export async function fetchImage(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
-  const db = await getDb();
-  const col = db.collection('images');
+  // 1. Try Codeforces images collection
+  try {
+    const db = await getDb();
+    const col = db.collection('images');
+    let doc = await col.findOne({ filename });
 
-  const doc = await col.findOne({ filename });
-  if (!doc) { return null; }
+    // 2. Fallback to CSES images collection
+    if (!doc) {
+      const csesDb = await getCsesDb();
+      doc = await csesDb.collection('images').findOne({ filename });
+    }
 
-  const raw = doc['data'] as Binary | Buffer;
-  const buffer = raw instanceof Binary ? Buffer.from(raw.buffer) : Buffer.from(raw);
-  return { buffer, contentType: doc['contentType'] as string };
+    if (!doc) { return null; }
+
+    const raw = doc['data'] as Binary | Buffer;
+    const buffer = raw instanceof Binary ? Buffer.from(raw.buffer) : Buffer.from(raw);
+    return { buffer, contentType: doc['contentType'] as string };
+  } catch (err) {
+    console.error(`[seudoe/db] fetchImage error for ${filename}:`, err);
+    return null;
+  }
 }
 
 /**
@@ -131,6 +226,8 @@ export async function closeDb(): Promise<void> {
     await _client.close();
     _client = null;
     _db = null;
+    _csesDb = null;
+    _csesProblemsCache = null;
     console.log('[seudoe/db] MongoDB connection closed');
   }
 }
