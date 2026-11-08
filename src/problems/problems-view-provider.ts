@@ -16,6 +16,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
   ) {
     // Listen to store updates (CF API sync, CSES sync, User status sync)
     this.problemsStore.onDidChangeTreeData(() => {
+      this._contestMap = undefined;
       this.sendMetadata();
     });
 
@@ -134,18 +135,138 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private _contestMap?: Map<number, string>;
+  private getContestName(contestId?: number): string {
+    if (!contestId) { return ''; }
+    if (!this._contestMap) {
+      this._contestMap = new Map();
+      const contestDb = this.problemsStore.getContests();
+      for (const c of contestDb.past) {
+        this._contestMap.set(c.contest.id, c.contest.name);
+      }
+      for (const c of contestDb.upcoming) {
+        this._contestMap.set(c.contest.id, c.contest.name);
+      }
+    }
+    return this._contestMap.get(contestId) || `Contest ${contestId}`;
+  }
+
+  private sortProblems(problems: CFProblem[], sort?: string): CFProblem[] {
+    if (!sort || sort === 'default') {
+      return problems;
+    }
+    const copy = [...problems];
+    switch (sort) {
+      case 'name':
+      case 'name_asc':
+        return copy.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+      case 'name_desc':
+        return copy.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+      case 'contest_num':
+      case 'contest_num_asc':
+        return copy.sort((a, b) => {
+          const cA = a.contestId ?? 0;
+          const cB = b.contestId ?? 0;
+          if (cA !== cB) { return cA - cB; }
+          return a.index.localeCompare(b.index, undefined, { numeric: true });
+        });
+      case 'contest_num_desc':
+        return copy.sort((a, b) => {
+          const cA = a.contestId ?? 0;
+          const cB = b.contestId ?? 0;
+          if (cA !== cB) { return cB - cA; }
+          return a.index.localeCompare(b.index, undefined, { numeric: true });
+        });
+
+      case 'contest':
+      case 'contest_asc':
+        return copy.sort((a, b) => {
+          const nameA = this.getContestName(a.contestId);
+          const nameB = this.getContestName(b.contestId);
+          const cmp = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+          if (cmp !== 0) { return cmp; }
+          return a.index.localeCompare(b.index, undefined, { numeric: true });
+        });
+      case 'contest_desc':
+        return copy.sort((a, b) => {
+          const nameA = this.getContestName(a.contestId);
+          const nameB = this.getContestName(b.contestId);
+          const cmp = nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: 'base' });
+          if (cmp !== 0) { return cmp; }
+          return a.index.localeCompare(b.index, undefined, { numeric: true });
+        });
+
+      case 'rating_asc':
+        return copy.sort((a, b) => {
+          const rA = (a.rating !== undefined && a.rating !== null && a.rating > 0) ? a.rating : 999999;
+          const rB = (b.rating !== undefined && b.rating !== null && b.rating > 0) ? b.rating : 999999;
+          if (rA !== rB) { return rA - rB; }
+          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        });
+      case 'rating':
+      case 'rating_desc':
+        return copy.sort((a, b) => {
+          const rA = (a.rating !== undefined && a.rating !== null && a.rating > 0) ? a.rating : -1;
+          const rB = (b.rating !== undefined && b.rating !== null && b.rating > 0) ? b.rating : -1;
+          if (rA !== rB) { return rB - rA; }
+          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+      case 'tags':
+      case 'tags_asc':
+        return copy.sort((a, b) => {
+          const tA = (a.tags && a.tags.length > 0) ? a.tags.join(', ') : 'zzz';
+          const tB = (b.tags && b.tags.length > 0) ? b.tags.join(', ') : 'zzz';
+          const cmp = tA.localeCompare(tB, undefined, { sensitivity: 'base' });
+          if (cmp !== 0) { return cmp; }
+          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        });
+      case 'tags_desc':
+        return copy.sort((a, b) => {
+          const tA = (a.tags && a.tags.length > 0) ? a.tags.join(', ') : '';
+          const tB = (b.tags && b.tags.length > 0) ? b.tags.join(', ') : '';
+          const cmp = tB.localeCompare(tA, undefined, { sensitivity: 'base' });
+          if (cmp !== 0) { return cmp; }
+          return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+      default:
+        return copy;
+    }
+  }
+
+  private sortCsesProblems(problems: CsesProblemSummary[], sort?: string): CsesProblemSummary[] {
+    const copy = [...problems];
+    switch (sort) {
+      case 'name':
+      case 'name_asc':
+        return copy.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+      case 'name_desc':
+        return copy.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
+      case 'default':
+      default:
+        return copy.sort((a, b) => (a.taskId || 0) - (b.taskId || 0));
+    }
+  }
+
   /** On-demand problem fetcher (lightweight IPC, avoids memory spikes) */
-  private handleLoadBucket(msg: { bucketType: string; key?: string; offset?: number; limit?: number }) {
+  private handleLoadBucket(msg: { bucketType: string; key?: string; offset?: number; limit?: number; sort?: string }) {
     if (!this._view) { return; }
-    const { bucketType, key, offset = 0, limit = 50 } = msg;
+    const { bucketType, key, offset = 0, limit = 50, sort } = msg;
 
     if (bucketType === 'all') {
-      const all = this.problemsStore.getProblems();
+      let all = this.problemsStore.getProblems();
+      if (sort && sort !== 'default') {
+        all = this.sortProblems(all, sort);
+      }
       const slice = all.slice(offset, offset + limit).map(p => ({
         contestId: p.contestId,
         index: p.index,
         name: p.name,
-        rating: p.rating
+        rating: p.rating,
+        tags: p.tags || [],
+        contestName: this.getContestName(p.contestId)
       }));
       this._view.webview.postMessage({
         type: 'bucketData',
@@ -154,55 +275,78 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         offset,
         problems: slice,
         hasMore: offset + limit < all.length,
-        total: all.length
+        total: all.length,
+        sort
       });
     } else if (bucketType === 'rating' && key) {
       const groups = this.problemsStore.getRatingGroups();
-      const list = groups[key] || [];
+      let list = groups[key] || [];
+      if (sort && sort !== 'default') {
+        list = this.sortProblems(list, sort);
+      }
       const problems = list.map(p => ({
         contestId: p.contestId,
         index: p.index,
         name: p.name,
-        rating: p.rating
+        rating: p.rating,
+        tags: p.tags || [],
+        contestName: this.getContestName(p.contestId)
       }));
       this._view.webview.postMessage({
         type: 'bucketData',
         bucketType,
         key,
-        problems
+        problems,
+        sort
       });
     } else if (bucketType === 'tag' && key) {
       const groups = this.problemsStore.getTagGroups();
-      const list = groups[key] || [];
+      let list = groups[key] || [];
+      if (sort && sort !== 'default') {
+        list = this.sortProblems(list, sort);
+      }
       const problems = list.map(p => ({
         contestId: p.contestId,
         index: p.index,
         name: p.name,
-        rating: p.rating
+        rating: p.rating,
+        tags: p.tags || [],
+        contestName: this.getContestName(p.contestId)
       }));
       this._view.webview.postMessage({
         type: 'bucketData',
         bucketType,
         key,
-        problems
+        problems,
+        sort
       });
     } else if (bucketType === 'contest' && key) {
       const past = this.problemsStore.getContests().past;
       const contest = past.find(c => String(c.contest.id) === String(key));
-      const problems = (contest?.problems || []).map(p => ({
+      let list = contest?.problems || [];
+      if (sort && sort !== 'default') {
+        list = this.sortProblems(list, sort);
+      }
+      const problems = list.map(p => ({
         contestId: p.contestId,
         index: p.index,
         name: p.name,
-        rating: p.rating
+        rating: p.rating,
+        tags: p.tags || [],
+        contestName: contest?.contest.name || ''
       }));
       this._view.webview.postMessage({
         type: 'bucketData',
         bucketType,
         key,
-        problems
+        problems,
+        sort
       });
     } else if (bucketType === 'cses') {
-      const list = this.problemsStore.getCsesProblems();
+      let list = this.problemsStore.getCsesProblems();
+      if (sort && sort !== 'default') {
+        list = this.sortCsesProblems(list, sort);
+      }
       const slice = list.slice(offset, offset + limit).map(p => ({
         id: p.id,
         taskId: p.taskId,
@@ -219,11 +363,15 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         offset,
         problems: slice,
         hasMore: offset + limit < list.length,
-        total: list.length
+        total: list.length,
+        sort
       });
     } else if (bucketType === 'csesCat' && key) {
       const map = this.problemsStore.getCsesCategoryGroups();
-      const list = map.get(key) || [];
+      let list = map.get(key) || [];
+      if (sort && sort !== 'default') {
+        list = this.sortCsesProblems(list, sort);
+      }
       const problems = list.map(p => ({
         id: p.id,
         taskId: p.taskId,
@@ -237,7 +385,8 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         type: 'bucketData',
         bucketType,
         key,
-        problems
+        problems,
+        sort
       });
     }
   }
@@ -366,6 +515,31 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForWebview(): string {
+    const renderTopSortDropdown = (id: string, isRatingSection: boolean = false, isCses: boolean = false) => {
+      if (isCses) {
+        return `
+        <select class="sort-select" id="sort_${id}" data-sub-id="${id}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onchange="handleSortSelectChange(this)">
+          <option value="default">Sort ▾</option>
+          <option value="name_asc">PS-Name (Asc) ▾</option>
+          <option value="name_desc">PS-Name (Desc) ▾</option>
+        </select>`;
+      }
+      return `
+        <select class="sort-select" id="sort_${id}" data-sub-id="${id}" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onchange="handleSortSelectChange(this)">
+          <option value="default">Sort ▾</option>
+          <option value="name_asc">PS-Name (Asc) ▾</option>
+          <option value="name_desc">PS-Name (Desc) ▾</option>
+          <option value="contest_num_asc">Contest-Number (Asc) ▾</option>
+          <option value="contest_num_desc">Contest-Number (Desc) ▾</option>
+          <option value="contest_asc">Contest-Name (Asc) ▾</option>
+          <option value="contest_desc">Contest-Name (Desc) ▾</option>${!isRatingSection ? `
+          <option value="rating_asc">Rating (Asc) ▾</option>
+          <option value="rating_desc">Rating (Desc) ▾</option>` : ''}
+          <option value="tags_asc">Tags (Asc) ▾</option>
+          <option value="tags_desc">Tags (Desc) ▾</option>
+        </select>`;
+    };
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -544,16 +718,53 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      flex-shrink: 1;
+      min-width: 0;
+    }
+    .sort-select {
+      border: none !important;
+      outline: none !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      color: var(--vscode-descriptionForeground, #999999);
+      font-family: inherit;
+      font-size: 11px;
+      height: 20px;
+      line-height: 20px;
+      padding: 0 !important;
+      margin: 0 0 0 6px;
+      cursor: pointer;
+      box-shadow: none !important;
+      appearance: none;
+      -webkit-appearance: none;
+      field-sizing: content;
+      width: auto;
+      vertical-align: middle;
+      display: inline-block;
       flex-shrink: 0;
+    }
+    .sort-select:hover {
+      color: var(--vscode-foreground, #ffffff);
+    }
+    .sort-select:focus {
+      outline: none !important;
+      color: var(--vscode-foreground, #ffffff);
+    }
+    .sort-select option {
+      background-color: var(--vscode-dropdown-background, #252526);
+      color: var(--vscode-dropdown-foreground, #cccccc);
+      padding: 4px 8px;
     }
     .tree-description {
       font-size: 12px;
-      margin-left: 8px;
+      margin-left: 6px;
       color: var(--vscode-descriptionForeground, #999999);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       opacity: 0.85;
+      flex-shrink: 1;
+      min-width: 0;
     }
     .rank-badge {
       font-size: 9px;
@@ -750,7 +961,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_all"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cf">CF</span>
         <span class="tree-label">All</span>
-        <span class="tree-description">Codeforces</span>
+        ${renderTopSortDropdown('all')}
       </div>
       <div class="tree-children" id="ch_all"></div>
 
@@ -759,7 +970,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_rating"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cf">CF</span>
         <span class="tree-label">Rating</span>
-        <span class="tree-description">Codeforces</span>
+        ${renderTopSortDropdown('rating', true)}
       </div>
       <div class="tree-children" id="ch_rating"></div>
 
@@ -768,7 +979,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_tag"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cf">CF</span>
         <span class="tree-label">Tag</span>
-        <span class="tree-description">Codeforces</span>
+        ${renderTopSortDropdown('tag')}
       </div>
       <div class="tree-children" id="ch_tag"></div>
 
@@ -777,7 +988,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_favorite"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cf">CF</span>
         <span class="tree-label">Favorite</span>
-        <span class="tree-description">Codeforces</span>
+        ${renderTopSortDropdown('favorite')}
       </div>
       <div class="tree-children" id="ch_favorite">
         <div class="tree-row indent-1"><span class="twistie leaf"></span><span class="tree-label" style="opacity: 0.6;">No favorites</span></div>
@@ -788,7 +999,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_past"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cf">CF</span>
         <span class="tree-label">Past Contests</span>
-        <span class="tree-description">Codeforces</span>
+        ${renderTopSortDropdown('past')}
       </div>
       <div class="tree-children" id="ch_past"></div>
 
@@ -797,7 +1008,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_upcoming"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cf">CF</span>
         <span class="tree-label">Upcoming Contests</span>
-        <span class="tree-description">Codeforces</span>
+        ${renderTopSortDropdown('upcoming')}
       </div>
       <div class="tree-children" id="ch_upcoming"></div>
 
@@ -806,7 +1017,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_cses-all"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cses">CSES</span>
         <span class="tree-label">CSES Problemset</span>
-        <span class="tree-description">CSES</span>
+        ${renderTopSortDropdown('cses-all', false, true)}
       </div>
       <div class="tree-children" id="ch_cses-all"></div>
 
@@ -815,7 +1026,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_cses-cat"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-cses">CSES</span>
         <span class="tree-label">CSES Categories</span>
-        <span class="tree-description">CSES</span>
+        ${renderTopSortDropdown('cses-cat', false, true)}
       </div>
       <div class="tree-children" id="ch_cses-cat"></div>
 
@@ -824,7 +1035,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_cp31"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-other">CP</span>
         <span class="tree-label">CP-31 Sheet</span>
-        <span class="tree-description">Coming soon</span>
+        ${renderTopSortDropdown('cp31')}
       </div>
       <div class="tree-children" id="ch_cp31">
         <div class="tree-row indent-1"><span class="twistie leaf"></span><span class="tree-label" style="opacity: 0.6;">Coming soon</span></div>
@@ -835,12 +1046,11 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         <span class="twistie" id="tw_a2oj"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
         <span class="badge-icon badge-other">CP</span>
         <span class="tree-label">A2OJ Ladders</span>
-        <span class="tree-description">Coming soon</span>
+        ${renderTopSortDropdown('a2oj')}
       </div>
       <div class="tree-children" id="ch_a2oj">
         <div class="tree-row indent-1"><span class="twistie leaf"></span><span class="tree-label" style="opacity: 0.6;">Coming soon</span></div>
-      </div>
-    </div>
+      </div></div>
   </div>
 
   <!-- TAB PANEL 1: SETTINGS VIEW (Matches Screenshot Cards) -->
@@ -976,8 +1186,305 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
     let meta = null;
     let settingsData = null;
     const bucketCache = {};
+    const bucketCacheRaw = {};
+    const sectionSorts = {};
+    const subSectionSorts = {};
     let allCurrentOffset = 0;
     let csesCurrentOffset = 0;
+
+    function adjustSelectWidth(sel) {
+      if (!sel) return;
+      var text = sel.options && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : (sel.value || 'Sort ▾');
+      if (!window._textMeasureCanvas) {
+        window._textMeasureCanvas = document.createElement('canvas');
+      }
+      var ctx = window._textMeasureCanvas.getContext('2d');
+      if (ctx) {
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+        var w = Math.ceil(ctx.measureText(text).width);
+        sel.style.width = (w + 2) + 'px';
+      }
+    }
+
+    function getSectionForBucketType(bucketType) {
+      if (bucketType === 'rating') return 'rating';
+      if (bucketType === 'tag') return 'tag';
+      if (bucketType === 'contest') return 'past';
+      if (bucketType === 'csesCat') return 'cses-cat';
+      return bucketType;
+    }
+
+    function getBucketTypeForSection(sectionId) {
+      if (sectionId === 'rating') return 'rating';
+      if (sectionId === 'tag') return 'tag';
+      if (sectionId === 'past') return 'contest';
+      if (sectionId === 'cses-cat') return 'csesCat';
+      return sectionId;
+    }
+
+    function renderSortDropdown(subId, isRatingSection, activeSort, bucketType, key) {
+      var current = activeSort || 'default';
+      if (current === 'name') current = 'name_asc';
+      if (current === 'contest_num') current = 'contest_num_asc';
+      if (current === 'contest') current = 'contest_asc';
+      if (current === 'rating') current = 'rating_desc';
+      if (current === 'tags') current = 'tags_asc';
+
+      var dataKeyAttr = bucketType ? (' data-bucket-type="' + bucketType + '" data-bucket-key="' + escapeHtml(String(key)) + '"') : '';
+
+      var isCses = (bucketType === 'csesCat' || bucketType === 'cses' || (subId && subId.indexOf('cses') !== -1));
+      if (isCses) {
+        return '<select class="sort-select" id="sort_' + subId + '" data-sub-id="' + subId + '"' + dataKeyAttr + ' ' +
+          'onclick="event.stopPropagation()" ' +
+          'onmousedown="event.stopPropagation()" ' +
+          'onchange="handleSortSelectChange(this)">' +
+          '<option value="default"' + (current === 'default' ? ' selected' : '') + '>Sort ▾</option>' +
+          '<option value="name_asc"' + (current === 'name_asc' ? ' selected' : '') + '>PS-Name (Asc) ▾</option>' +
+          '<option value="name_desc"' + (current === 'name_desc' ? ' selected' : '') + '>PS-Name (Desc) ▾</option>' +
+          '</select>';
+      }
+
+      var html = '<select class="sort-select" id="sort_' + subId + '" data-sub-id="' + subId + '"' + dataKeyAttr + ' ' +
+        'onclick="event.stopPropagation()" ' +
+        'onmousedown="event.stopPropagation()" ' +
+        'onchange="handleSortSelectChange(this)">' +
+        '<option value="default"' + (current === 'default' ? ' selected' : '') + '>Sort ▾</option>' +
+        '<option value="name_asc"' + (current === 'name_asc' ? ' selected' : '') + '>PS-Name (Asc) ▾</option>' +
+        '<option value="name_desc"' + (current === 'name_desc' ? ' selected' : '') + '>PS-Name (Desc) ▾</option>' +
+        '<option value="contest_num_asc"' + (current === 'contest_num_asc' ? ' selected' : '') + '>Contest-Number (Asc) ▾</option>' +
+        '<option value="contest_num_desc"' + (current === 'contest_num_desc' ? ' selected' : '') + '>Contest-Number (Desc) ▾</option>' +
+        '<option value="contest_asc"' + (current === 'contest_asc' ? ' selected' : '') + '>Contest-Name (Asc) ▾</option>' +
+        '<option value="contest_desc"' + (current === 'contest_desc' ? ' selected' : '') + '>Contest-Name (Desc) ▾</option>';
+
+      if (!isRatingSection) {
+        html += '<option value="rating_asc"' + (current === 'rating_asc' ? ' selected' : '') + '>Rating (Asc) ▾</option>' +
+                '<option value="rating_desc"' + (current === 'rating_desc' ? ' selected' : '') + '>Rating (Desc) ▾</option>';
+      }
+
+      html += '<option value="tags_asc"' + (current === 'tags_asc' ? ' selected' : '') + '>Tags (Asc) ▾</option>' +
+              '<option value="tags_desc"' + (current === 'tags_desc' ? ' selected' : '') + '>Tags (Desc) ▾</option>' +
+              '</select>';
+      return html;
+    }
+
+    function handleSortSelectChange(sel) {
+      var subId = sel.getAttribute('data-sub-id');
+      var bucketType = sel.getAttribute('data-bucket-type');
+      var key = sel.getAttribute('data-bucket-key');
+      var sortValue = sel.value;
+      adjustSelectWidth(sel);
+      if (bucketType) {
+        onSubSortChange(subId, bucketType, key, sortValue);
+      } else {
+        onSortChange(subId, sortValue);
+      }
+    }
+
+    function handleSubNodeClick(el) {
+      var subId = el.getAttribute('data-sub-id');
+      var bucketType = el.getAttribute('data-bucket-type');
+      var key = el.getAttribute('data-bucket-key');
+      toggleSubNode(subId, bucketType, key);
+    }
+
+    function sortProblemList(list, sortValue) {
+      var copy = list.slice();
+      switch (sortValue) {
+        case 'name':
+        case 'name_asc':
+          return copy.sort(function(a, b) {
+            return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
+          });
+        case 'name_desc':
+          return copy.sort(function(a, b) {
+            return (b.name || '').localeCompare(a.name || '', undefined, { numeric: true, sensitivity: 'base' });
+          });
+
+        case 'contest_num':
+        case 'contest_num_asc':
+          return copy.sort(function(a, b) {
+            var cA = a.contestId || a.taskId || 0;
+            var cB = b.contestId || b.taskId || 0;
+            if (cA !== cB) return cA - cB;
+            return (a.index || '').localeCompare(b.index || '', undefined, { numeric: true });
+          });
+        case 'contest_num_desc':
+          return copy.sort(function(a, b) {
+            var cA = a.contestId || a.taskId || 0;
+            var cB = b.contestId || b.taskId || 0;
+            if (cA !== cB) return cB - cA;
+            return (a.index || '').localeCompare(b.index || '', undefined, { numeric: true });
+          });
+
+        case 'contest':
+        case 'contest_asc':
+          return copy.sort(function(a, b) {
+            var cA = a.contestName || (a.contestId ? ('Contest ' + a.contestId) : (a.category || ''));
+            var cB = b.contestName || (b.contestId ? ('Contest ' + b.contestId) : (b.category || ''));
+            var cmp = cA.localeCompare(cB, undefined, { numeric: true, sensitivity: 'base' });
+            if (cmp !== 0) return cmp;
+            return (a.index || '').localeCompare(b.index || '', undefined, { numeric: true });
+          });
+        case 'contest_desc':
+          return copy.sort(function(a, b) {
+            var cA = a.contestName || (a.contestId ? ('Contest ' + a.contestId) : (a.category || ''));
+            var cB = b.contestName || (b.contestId ? ('Contest ' + b.contestId) : (b.category || ''));
+            var cmp = cB.localeCompare(cA, undefined, { numeric: true, sensitivity: 'base' });
+            if (cmp !== 0) return cmp;
+            return (a.index || '').localeCompare(b.index || '', undefined, { numeric: true });
+          });
+
+        case 'rating_asc':
+          return copy.sort(function(a, b) {
+            if (a.isCses || b.isCses) {
+              return (a.solvedCount || 0) - (b.solvedCount || 0);
+            }
+            var rA = (a.rating !== undefined && a.rating !== null && a.rating > 0) ? a.rating : 999999;
+            var rB = (b.rating !== undefined && b.rating !== null && b.rating > 0) ? b.rating : 999999;
+            if (rA !== rB) return rA - rB;
+            return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
+          });
+        case 'rating':
+        case 'rating_desc':
+          return copy.sort(function(a, b) {
+            if (a.isCses || b.isCses) {
+              return (b.solvedCount || 0) - (a.solvedCount || 0);
+            }
+            var rA = (a.rating !== undefined && a.rating !== null && a.rating > 0) ? a.rating : -1;
+            var rB = (b.rating !== undefined && b.rating !== null && b.rating > 0) ? b.rating : -1;
+            if (rA !== rB) return rB - rA;
+            return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
+          });
+
+        case 'tags':
+        case 'tags_asc':
+          return copy.sort(function(a, b) {
+            var tA = (a.tags && a.tags.length > 0) ? a.tags.join(', ') : (a.category || 'zzz');
+            var tB = (b.tags && b.tags.length > 0) ? b.tags.join(', ') : (b.category || 'zzz');
+            var cmp = tA.localeCompare(tB, undefined, { sensitivity: 'base' });
+            if (cmp !== 0) return cmp;
+            return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
+          });
+        case 'tags_desc':
+          return copy.sort(function(a, b) {
+            var tA = (a.tags && a.tags.length > 0) ? a.tags.join(', ') : (a.category || '');
+            var tB = (b.tags && b.tags.length > 0) ? b.tags.join(', ') : (b.category || '');
+            var cmp = tB.localeCompare(tA, undefined, { sensitivity: 'base' });
+            if (cmp !== 0) return cmp;
+            return (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
+          });
+
+        default:
+          if (copy.length > 0 && copy[0].isCses) {
+            return copy.sort(function(a, b) {
+              return (a.taskId || 0) - (b.taskId || 0);
+            });
+          }
+          return copy;
+      }
+    }
+
+    function applySortAndRender(cacheKey, sortValue) {
+      var raw = bucketCacheRaw[cacheKey];
+      if (!raw) return;
+
+      var sorted = raw.slice();
+      sorted = sortProblemList(sorted, sortValue);
+      bucketCache[cacheKey] = sorted;
+
+      var colonIdx = cacheKey.indexOf(':');
+      var bucketType = cacheKey.substring(0, colonIdx);
+
+      var ch = null;
+      document.querySelectorAll('.tree-children').forEach(function(el) {
+        if (el.getAttribute('data-cache-key') === cacheKey) {
+          ch = el;
+        }
+      });
+
+      if (ch) {
+        if (bucketType === 'csesCat') {
+          ch.innerHTML = renderCsesProblemRows(sorted);
+        } else {
+          ch.innerHTML = renderProblemRows(sorted);
+        }
+      }
+    }
+
+    function onSubSortChange(subId, bucketType, key, sortValue) {
+      var cacheKey = bucketType + ':' + key;
+      subSectionSorts[cacheKey] = sortValue;
+
+      var ch = document.getElementById('subch_' + subId);
+      var tw = document.getElementById('subtw_' + subId);
+
+      if (ch && !ch.classList.contains('open')) {
+        ch.classList.add('open');
+        if (tw) tw.classList.add('expanded');
+      }
+
+      if (bucketCacheRaw[cacheKey]) {
+        applySortAndRender(cacheKey, sortValue);
+      } else {
+        if (ch) {
+          ch.innerHTML = '<div class="tree-row indent-2"><span class="status-slot"></span><span class="tree-label" style="opacity: 0.6;">Loading...</span></div>';
+        }
+        vscode.postMessage({ type: 'loadBucket', bucketType: bucketType, key: key, sort: sortValue });
+      }
+    }
+
+    function onSortChange(sectionId, sortValue) {
+      sectionSorts[sectionId] = sortValue;
+
+      var ch = document.getElementById('ch_' + sectionId);
+      var tw = document.getElementById('tw_' + sectionId);
+
+      if (ch && !ch.classList.contains('open')) {
+        ch.classList.add('open');
+        if (tw) tw.classList.add('expanded');
+      }
+
+      if (sectionId === 'all') {
+        bucketCache['all'] = null;
+        bucketCacheRaw['all'] = null;
+        allCurrentOffset = 0;
+        if (ch) {
+          ch.innerHTML = '<div class="tree-row indent-1"><span class="status-slot"></span><span class="tree-label" style="opacity: 0.6;">Loading...</span></div>';
+        }
+        vscode.postMessage({ type: 'loadBucket', bucketType: 'all', offset: 0, limit: 50, sort: sortValue });
+        return;
+      }
+
+      if (sectionId === 'cses-all') {
+        bucketCache['cses'] = null;
+        bucketCacheRaw['cses'] = null;
+        csesCurrentOffset = 0;
+        if (ch) {
+          ch.innerHTML = '<div class="tree-row indent-1"><span class="status-slot"></span><span class="tree-label" style="opacity: 0.6;">Loading...</span></div>';
+        }
+        vscode.postMessage({ type: 'loadBucket', bucketType: 'cses', offset: 0, limit: 50, sort: sortValue });
+        return;
+      }
+
+      if (ch) {
+        var selects = ch.querySelectorAll('.sort-select');
+        selects.forEach(function(s) {
+          if (sectionId === 'rating' && sortValue === 'rating') return;
+          s.value = sortValue;
+          adjustSelectWidth(s);
+        });
+      }
+
+      var bType = getBucketTypeForSection(sectionId);
+      Object.keys(bucketCacheRaw).forEach(function(cacheKey) {
+        if (cacheKey.indexOf(bType + ':') === 0) {
+          subSectionSorts[cacheKey] = sortValue;
+          applySortAndRender(cacheKey, sortValue);
+        }
+      });
+
+      expandCategory(sectionId, true);
+    }
 
     // Switch Tabs: 0 = Problems, 1 = Settings
     function switchTab(idx) {
@@ -1020,11 +1527,12 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         ch.classList.add('open');
         tw.classList.add('expanded');
         
-        // Lazy load problems for this sub-bucket if not yet cached
-        const cacheKey = bucketType + ':' + key;
-        if (!bucketCache[cacheKey]) {
+        var cacheKey = bucketType + ':' + key;
+        if (!bucketCacheRaw[cacheKey]) {
           ch.innerHTML = '<div class="tree-row indent-2"><span class="status-slot"></span><span class="tree-label" style="opacity: 0.6;">Loading...</span></div>';
-          vscode.postMessage({ type: 'loadBucket', bucketType, key });
+          var parentType = getSectionForBucketType(bucketType);
+          var sort = subSectionSorts[cacheKey] || sectionSorts[parentType] || 'default';
+          vscode.postMessage({ type: 'loadBucket', bucketType: bucketType, key: key, sort: sort });
         }
       }
     }
@@ -1037,6 +1545,14 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
       });
     }
 
+    function handleCfProblemClick(el) {
+      var contestId = parseInt(el.getAttribute('data-contest-id') || '0', 10);
+      var index = el.getAttribute('data-index') || '';
+      var name = el.getAttribute('data-name') || '';
+      var rating = parseInt(el.getAttribute('data-rating') || '0', 10) || undefined;
+      openCfProblem(contestId, index, name, rating);
+    }
+
     function openCsesProblem(taskId, name, category, url) {
       vscode.postMessage({
         type: 'openCsesProblem',
@@ -1044,12 +1560,20 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
       });
     }
 
+    function handleCsesProblemClick(el) {
+      var taskId = el.getAttribute('data-task-id') || '';
+      var name = el.getAttribute('data-name') || '';
+      var category = el.getAttribute('data-category') || '';
+      var url = el.getAttribute('data-url') || '';
+      openCsesProblem(taskId, name, category, url);
+    }
+
     // Status icon helper matching generateStatusIcon in problems-view.ts
     function getStatusSlotHtml(probId) {
       const status = meta && meta.userProblems ? meta.userProblems[probId] : null;
       if (status) {
         const cls = status.startsWith('+') ? 'status-pos' : 'status-neg';
-        return \`<span class="status-slot \${cls}">\${escapeHtml(status)}</span>\`;
+        return '<span class="status-slot ' + cls + '">' + escapeHtml(status) + '</span>';
       }
       return '<span class="status-slot"></span>';
     }
@@ -1088,191 +1612,286 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
       const color = getRatingColor(p.rating);
       const badge = getRankBadge(p.rating);
       const escName = escapeHtml(p.name);
-      return \`<div class="tree-row \${indentClass}" onclick="openCfProblem(\${p.contestId || 0}, '\${p.index}', '\${escName.replace(/'/g, "\\\\'")}', \${p.rating || 0})">
-        \${getStatusSlotHtml(id)}
-        <span class="tree-label" \${p.rating ? \`style="color: \${color};"\` : ''}>[\${id}] \${escName}</span>
-        \${p.rating ? \`
-          <span class="tree-description" style="color: \${color}; font-weight: 600;">★ \${p.rating}</span>
-          \${badge ? \`<span class="rank-badge" style="color: \${color}; border-color: \${color};">\${badge}</span>\` : ''}
-        \` : ''}
-      </div>\`;
+      var labelStyle = p.rating ? (' style="color: ' + color + ';"') : '';
+      var ratingDesc = p.rating ? ('<span class="tree-description" style="color: ' + color + '; font-weight: 600;">★ ' + p.rating + '</span>' + (badge ? ('<span class="rank-badge" style="color: ' + color + '; border-color: ' + color + ';">' + badge + '</span>') : '')) : '';
+      return '<div class="tree-row ' + indentClass + '" data-contest-id="' + (p.contestId || 0) + '" data-index="' + escapeHtml(p.index || '') + '" data-name="' + escName + '" data-rating="' + (p.rating || 0) + '" onclick="handleCfProblemClick(this)">' +
+        getStatusSlotHtml(id) +
+        '<span class="tree-label"' + labelStyle + '>[' + id + '] ' + escName + '</span>' +
+        ratingDesc +
+      '</div>';
     }
 
     // Expand category on demand
-    function expandCategory(catId) {
+    function expandCategory(catId, preserveOpenState) {
       if (!meta) return;
-      const container = document.getElementById('ch_' + catId);
+      var container = document.getElementById('ch_' + catId);
       if (!container) return;
+
+      var openSubIds = new Set();
+      if (preserveOpenState) {
+        container.querySelectorAll('.tree-children.open').forEach(function(el) {
+          openSubIds.add(el.id);
+        });
+      }
 
       if (catId === 'all') {
         if (!bucketCache['all']) {
           container.innerHTML = '<div class="tree-row indent-1"><span class="status-slot"></span><span class="tree-label" style="opacity: 0.6;">Loading...</span></div>';
           allCurrentOffset = 0;
-          vscode.postMessage({ type: 'loadBucket', bucketType: 'all', offset: 0, limit: 50 });
+          var sort = sectionSorts['all'] || 'default';
+          vscode.postMessage({ type: 'loadBucket', bucketType: 'all', offset: 0, limit: 50, sort: sort });
         }
       } else if (catId === 'rating') {
-        const ratings = meta.ratings || [];
-        container.innerHTML = ratings.map((r, i) => {
-          const subId = 'rating_' + i;
-          const color = getRatingColor(r.rating);
-          const badge = r.description || getRankBadge(r.rating);
-          return \`<div>
-            <div class="tree-row indent-1" onclick="toggleSubNode('\${subId}', 'rating', '\${r.rating}')">
-              <span class="twistie" id="subtw_\${subId}"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
-              <span class="folder-icon" style="color: \${color};"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>
-              <span class="tree-label" style="color: \${color}; font-weight: 600;">\${r.rating}</span>
-              \${badge ? \`<span class="rank-badge" style="color: \${color}; border-color: \${color};">\${badge}</span>\` : ''}
-              <span class="tree-count">\${r.count ? r.count : ''}</span>
-            </div>
-            <div class="tree-children" id="subch_\${subId}"></div>
-          </div>\`;
+        var ratings = (meta.ratings || []).slice();
+        var activeCatSort = sectionSorts['rating'];
+        if (activeCatSort === 'rating_desc') {
+          ratings.sort(function(a, b) { return (Number(b.rating) || 0) - (Number(a.rating) || 0); });
+        } else if (activeCatSort === 'rating_asc') {
+          ratings.sort(function(a, b) { return (Number(a.rating) || 0) - (Number(b.rating) || 0); });
+        }
+        container.innerHTML = ratings.map(function(r, i) {
+          var subId = 'rating_' + i;
+          var color = getRatingColor(r.rating);
+          var badge = r.description || getRankBadge(r.rating);
+          var activeSort = subSectionSorts['rating:' + r.rating] || sectionSorts['rating'] || 'default';
+          return '<div>' +
+            '<div class="tree-row indent-1" data-sub-id="' + subId + '" data-bucket-type="rating" data-bucket-key="' + r.rating + '" onclick="handleSubNodeClick(this)">' +
+              '<span class="twistie" id="subtw_' + subId + '"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>' +
+              '<span class="folder-icon" style="color: ' + color + ';"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>' +
+              '<span class="tree-label" style="color: ' + color + '; font-weight: 600;">' + r.rating + '</span>' +
+              renderSortDropdown(subId, true, activeSort, 'rating', r.rating) +
+              (badge ? '<span class="rank-badge" style="color: ' + color + '; border-color: ' + color + ';">' + badge + '</span>' : '') +
+              '<span class="tree-count">' + (r.count ? r.count : '') + '</span>' +
+            '</div>' +
+            '<div class="tree-children" id="subch_' + subId + '" data-cache-key="rating:' + r.rating + '"></div>' +
+          '</div>';
         }).join('');
+        container.querySelectorAll('.sort-select').forEach(adjustSelectWidth);
       } else if (catId === 'tag') {
-        const tags = meta.tags || [];
-        container.innerHTML = tags.map((t, i) => {
-          const subId = 'tag_' + i;
-          return \`<div>
-            <div class="tree-row indent-1" onclick="toggleSubNode('\${subId}', 'tag', '\${t.rawTag}')">
-              <span class="twistie" id="subtw_\${subId}"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
-              <span class="folder-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>
-              <span class="tree-label">\${escapeHtml(t.tag)}</span>
-              <span class="tree-description">\${t.count}</span>
-            </div>
-            <div class="tree-children" id="subch_\${subId}"></div>
-          </div>\`;
+        var tags = (meta.tags || []).slice();
+        var activeCatSort = sectionSorts['tag'];
+        if (activeCatSort === 'name_desc' || activeCatSort === 'tags_desc') {
+          tags.sort(function(a, b) { return b.tag.localeCompare(a.tag); });
+        } else if (activeCatSort === 'name' || activeCatSort === 'name_asc' || activeCatSort === 'tags' || activeCatSort === 'tags_asc') {
+          tags.sort(function(a, b) { return a.tag.localeCompare(b.tag); });
+        }
+        container.innerHTML = tags.map(function(t, i) {
+          var subId = 'tag_' + i;
+          var activeSort = subSectionSorts['tag:' + t.rawTag] || activeCatSort || 'default';
+          return '<div>' +
+            '<div class="tree-row indent-1" data-sub-id="' + subId + '" data-bucket-type="tag" data-bucket-key="' + t.rawTag + '" onclick="handleSubNodeClick(this)">' +
+              '<span class="twistie" id="subtw_' + subId + '"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>' +
+              '<span class="folder-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>' +
+              '<span class="tree-label">' + escapeHtml(t.tag) + '</span>' +
+              renderSortDropdown(subId, false, activeSort, 'tag', t.rawTag) +
+              '<span class="tree-description">' + t.count + '</span>' +
+            '</div>' +
+            '<div class="tree-children" id="subch_' + subId + '" data-cache-key="tag:' + t.rawTag + '"></div>' +
+          '</div>';
         }).join('');
+        container.querySelectorAll('.sort-select').forEach(adjustSelectWidth);
       } else if (catId === 'past') {
-        const past = meta.pastContests || [];
-        container.innerHTML = past.map((c, i) => {
-          const subId = 'past_' + i;
-          return \`<div>
-            <div class="tree-row indent-1" onclick="toggleSubNode('\${subId}', 'contest', '\${c.id}')">
-              <span class="twistie" id="subtw_\${subId}"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
-              <span class="folder-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>
-              <span class="tree-label">[\${c.id}] \${escapeHtml(c.name)}</span>
-              <span class="tree-description">\${c.count} problems</span>
-            </div>
-            <div class="tree-children" id="subch_\${subId}"></div>
-          </div>\`;
+        var past = (meta.pastContests || []).slice();
+        var activeCatSort = sectionSorts['past'];
+        if (activeCatSort === 'name_desc' || activeCatSort === 'contest_desc') {
+          past.sort(function(a, b) { return b.name.localeCompare(a.name); });
+        } else if (activeCatSort === 'name' || activeCatSort === 'name_asc' || activeCatSort === 'contest' || activeCatSort === 'contest_asc') {
+          past.sort(function(a, b) { return a.name.localeCompare(b.name); });
+        } else if (activeCatSort === 'contest_num_asc') {
+          past.sort(function(a, b) { return (a.id || 0) - (b.id || 0); });
+        } else if (activeCatSort === 'contest_num' || activeCatSort === 'contest_num_desc' || activeCatSort === 'rating' || activeCatSort === 'rating_desc') {
+          past.sort(function(a, b) { return (b.id || 0) - (a.id || 0); });
+        }
+        container.innerHTML = past.map(function(c, i) {
+          var subId = 'past_' + i;
+          var activeSort = subSectionSorts['contest:' + c.id] || activeCatSort || 'default';
+          return '<div>' +
+            '<div class="tree-row indent-1" data-sub-id="' + subId + '" data-bucket-type="contest" data-bucket-key="' + c.id + '" onclick="handleSubNodeClick(this)">' +
+              '<span class="twistie" id="subtw_' + subId + '"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>' +
+              '<span class="folder-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>' +
+              '<span class="tree-label">[' + c.id + '] ' + escapeHtml(c.name) + '</span>' +
+              renderSortDropdown(subId, false, activeSort, 'contest', c.id) +
+              '<span class="tree-description">' + c.count + ' problems</span>' +
+            '</div>' +
+            '<div class="tree-children" id="subch_' + subId + '" data-cache-key="contest:' + c.id + '"></div>' +
+          '</div>';
         }).join('');
+        container.querySelectorAll('.sort-select').forEach(adjustSelectWidth);
       } else if (catId === 'upcoming') {
-        const up = meta.upcomingContests || [];
+        var up = (meta.upcomingContests || []).slice();
+        var activeCatSort = sectionSorts['upcoming'];
+        if (activeCatSort === 'name_desc' || activeCatSort === 'contest_desc') {
+          up.sort(function(a, b) { return b.name.localeCompare(a.name); });
+        } else if (activeCatSort === 'name' || activeCatSort === 'name_asc' || activeCatSort === 'contest' || activeCatSort === 'contest_asc') {
+          up.sort(function(a, b) { return a.name.localeCompare(b.name); });
+        } else if (activeCatSort === 'contest_num_asc') {
+          up.sort(function(a, b) { return (a.id || 0) - (b.id || 0); });
+        } else if (activeCatSort === 'contest_num' || activeCatSort === 'contest_num_desc') {
+          up.sort(function(a, b) { return (b.id || 0) - (a.id || 0); });
+        }
         if (up.length === 0) {
           container.innerHTML = '<div class="tree-row indent-1"><span class="tree-label" style="opacity: 0.6;">No upcoming contests</span></div>';
           return;
         }
-        container.innerHTML = up.map(c => {
-          const remaining = c.startTimeSeconds ? (c.startTimeSeconds - Math.floor(Date.now() / 1000)) : 0;
-          let timeStr = 'Starting soon';
+        container.innerHTML = up.map(function(c) {
+          var remaining = c.startTimeSeconds ? (c.startTimeSeconds - Math.floor(Date.now() / 1000)) : 0;
+          var timeStr = 'Starting soon';
           if (remaining > 0) {
-            const d = Math.floor(remaining / 86400);
-            const h = Math.floor((remaining % 86400) / 3600);
-            const m = Math.floor((remaining % 3600) / 60);
+            var d = Math.floor(remaining / 86400);
+            var h = Math.floor((remaining % 86400) / 3600);
+            var m = Math.floor((remaining % 3600) / 60);
             timeStr = 'Starts in ' + (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm';
           }
-          return \`<div class="tree-row indent-1">
-            <span class="status-slot"></span>
-            <span class="tree-label">\${escapeHtml(c.name)}</span>
-            <span class="tree-description">\${timeStr}</span>
-          </div>\`;
+          return '<div class="tree-row indent-1">' +
+            '<span class="status-slot"></span>' +
+            '<span class="tree-label">' + escapeHtml(c.name) + '</span>' +
+            '<span class="tree-description">' + timeStr + '</span>' +
+          '</div>';
         }).join('');
       } else if (catId === 'cses-all') {
         if (!bucketCache['cses']) {
           container.innerHTML = '<div class="tree-row indent-1"><span class="status-slot"></span><span class="tree-label" style="opacity: 0.6;">Loading...</span></div>';
           csesCurrentOffset = 0;
-          vscode.postMessage({ type: 'loadBucket', bucketType: 'cses', offset: 0, limit: 50 });
+          var sort = sectionSorts['cses-all'] || 'default';
+          vscode.postMessage({ type: 'loadBucket', bucketType: 'cses', offset: 0, limit: 50, sort: sort });
         }
       } else if (catId === 'cses-cat') {
-        const cats = meta.csesCategories || [];
-        container.innerHTML = cats.map((c, i) => {
-          const subId = 'cses_cat_' + i;
-          return \`<div>
-            <div class="tree-row indent-1" onclick="toggleSubNode('\${subId}', 'csesCat', '\${escapeHtml(c.category)}')">
-              <span class="twistie" id="subtw_\${subId}"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>
-              <span class="folder-icon" style="color: #10b981;"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>
-              <span class="tree-label">\${escapeHtml(c.category)}</span>
-              <span class="tree-description">\${c.count} problems</span>
-            </div>
-            <div class="tree-children" id="subch_\${subId}"></div>
-          </div>\`;
+        var cats = (meta.csesCategories || []).slice();
+        var activeCatSort = sectionSorts['cses-cat'];
+        if (activeCatSort === 'name_desc') {
+          cats.sort(function(a, b) { return b.category.localeCompare(a.category); });
+        } else if (activeCatSort === 'name' || activeCatSort === 'name_asc') {
+          cats.sort(function(a, b) { return a.category.localeCompare(b.category); });
+        }
+        container.innerHTML = cats.map(function(c, i) {
+          var subId = 'cses_cat_' + i;
+          var activeSort = subSectionSorts['csesCat:' + c.category] || activeCatSort || 'default';
+          return '<div>' +
+            '<div class="tree-row indent-1" data-sub-id="' + subId + '" data-bucket-type="csesCat" data-bucket-key="' + escapeHtml(c.category) + '" onclick="handleSubNodeClick(this)">' +
+              '<span class="twistie" id="subtw_' + subId + '"><svg width="8" height="8" viewBox="0 0 8 8"><polygon points="2,1 6,4 2,7" fill="currentColor"/></svg></span>' +
+              '<span class="folder-icon" style="color: #10b981;"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V13H2V3h4l1.5 1.5H14z"/></svg></span>' +
+              '<span class="tree-label">' + escapeHtml(c.category) + '</span>' +
+              renderSortDropdown(subId, false, activeSort, 'csesCat', c.category) +
+              '<span class="tree-description">' + c.count + ' problems</span>' +
+            '</div>' +
+            '<div class="tree-children" id="subch_' + subId + '" data-cache-key="csesCat:' + escapeHtml(c.category) + '"></div>' +
+          '</div>';
         }).join('');
+        container.querySelectorAll('.sort-select').forEach(adjustSelectWidth);
+      }
+
+      if (openSubIds.size > 0) {
+        openSubIds.forEach(function(subChId) {
+          var subCh = document.getElementById(subChId);
+          var subTw = document.getElementById(subChId.replace('subch_', 'subtw_'));
+          if (subCh) subCh.classList.add('open');
+          if (subTw) subTw.classList.add('expanded');
+          var cacheKey = subCh ? subCh.getAttribute('data-cache-key') : null;
+          if (cacheKey && bucketCacheRaw[cacheKey]) {
+            var activeSort = subSectionSorts[cacheKey] || sectionSorts[catId] || 'default';
+            applySortAndRender(cacheKey, activeSort);
+          }
+        });
       }
     }
 
     function renderProblemRows(problems) {
-      return (problems || []).map(p => renderCfProblemRow(p, 'indent-2')).join('');
+      return (problems || []).map(function(p) { return renderCfProblemRow(p, 'indent-2'); }).join('');
     }
 
     function renderCsesProblemRow(p, indentClass) {
-      const escName = escapeHtml(p.name);
-      const escCat = escapeHtml(p.category || '');
-      const desc = p.solvedCount ? \`✓ \${p.solvedCount.toLocaleString()}\` : escCat;
-      return \`<div class="tree-row \${indentClass}" onclick="openCsesProblem('\${p.taskId}', '\${escName.replace(/'/g, "\\\\'")}', '\${escCat.replace(/'/g, "\\\\'")}', '\${p.url || ''}')">
-        <span class="status-slot"></span>
-        <span class="tree-label">[\${p.taskId}] \${escName}</span>
-        <span class="tree-description">\${desc}</span>
-      </div>\`;
+      var escName = escapeHtml(p.name);
+      var escCat = escapeHtml(p.category || '');
+      var desc = p.solvedCount ? ('✓ ' + p.solvedCount.toLocaleString()) : escCat;
+      return '<div class="tree-row ' + indentClass + '" data-task-id="' + escapeHtml(String(p.taskId || '')) + '" data-name="' + escName + '" data-category="' + escCat + '" data-url="' + escapeHtml(p.url || '') + '" onclick="handleCsesProblemClick(this)">' +
+        '<span class="status-slot"></span>' +
+        '<span class="tree-label">[' + p.taskId + '] ' + escName + '</span>' +
+        '<span class="tree-description">' + desc + '</span>' +
+      '</div>';
     }
 
     function renderCsesProblemRows(problems) {
-      return (problems || []).map(p => renderCsesProblemRow(p, 'indent-2')).join('');
+      return (problems || []).map(function(p) { return renderCsesProblemRow(p, 'indent-2'); }).join('');
     }
 
     function loadMoreAll() {
       allCurrentOffset += 50;
-      vscode.postMessage({ type: 'loadBucket', bucketType: 'all', offset: allCurrentOffset, limit: 50 });
+      var sort = sectionSorts['all'] || 'default';
+      vscode.postMessage({ type: 'loadBucket', bucketType: 'all', offset: allCurrentOffset, limit: 50, sort: sort });
     }
 
     function loadMoreCses() {
       csesCurrentOffset += 50;
-      vscode.postMessage({ type: 'loadBucket', bucketType: 'cses', offset: csesCurrentOffset, limit: 50 });
+      var sort = sectionSorts['cses-all'] || 'default';
+      vscode.postMessage({ type: 'loadBucket', bucketType: 'cses', offset: csesCurrentOffset, limit: 50, sort: sort });
     }
 
     // Populate bucket data received lazily from extension
     function onBucketDataReceived(data) {
-      const { bucketType, key, problems, offset, hasMore, total } = data;
-      const cacheKey = bucketType + ':' + key;
+      var bucketType = data.bucketType;
+      var key = data.key;
+      var problems = data.problems;
+      var offset = data.offset || 0;
+      var hasMore = data.hasMore;
+      var total = data.total;
+      var cacheKey = bucketType + ':' + key;
 
       if (bucketType === 'all') {
-        const container = document.getElementById('ch_all');
+        var container = document.getElementById('ch_all');
         if (!container) return;
-        if (!bucketCache['all']) bucketCache['all'] = [];
-        bucketCache['all'].push(...problems);
+        if (offset === 0 || !bucketCache['all']) {
+          bucketCache['all'] = problems.slice();
+        } else {
+          bucketCache['all'].push.apply(bucketCache['all'], problems);
+        }
 
-        let html = bucketCache['all'].map(p => renderCfProblemRow(p, 'indent-1')).join('');
+        var html = bucketCache['all'].map(function(p) { return renderCfProblemRow(p, 'indent-1'); }).join('');
 
         if (hasMore) {
-          html += \`<div class="load-more-row" onclick="loadMoreAll()">Load more problems (\${total - bucketCache['all'].length} remaining)...</div>\`;
+          html += '<div class="load-more-row" onclick="loadMoreAll()">Load more problems (' + (total - bucketCache['all'].length) + ' remaining)...</div>';
         }
         container.innerHTML = html;
       } else if (bucketType === 'cses') {
-        const container = document.getElementById('ch_cses-all');
+        var container = document.getElementById('ch_cses-all');
         if (!container) return;
-        if (!bucketCache['cses']) bucketCache['cses'] = [];
-        bucketCache['cses'].push(...problems);
+        if (offset === 0 || !bucketCache['cses']) {
+          bucketCache['cses'] = problems.slice();
+        } else {
+          bucketCache['cses'].push.apply(bucketCache['cses'], problems);
+        }
 
-        let html = bucketCache['cses'].map(p => renderCsesProblemRow(p, 'indent-1')).join('');
+        var html = bucketCache['cses'].map(function(p) { return renderCsesProblemRow(p, 'indent-1'); }).join('');
 
         if (hasMore) {
-          html += \`<div class="load-more-row" onclick="loadMoreCses()">Load more problems (\${total - bucketCache['cses'].length} remaining)...</div>\`;
+          html += '<div class="load-more-row" onclick="loadMoreCses()">Load more problems (' + (total - bucketCache['cses'].length) + ' remaining)...</div>';
         }
         container.innerHTML = html;
       } else {
-        bucketCache[cacheKey] = problems;
-        // Find which subch element matches this
-        document.querySelectorAll('.tree-children').forEach(ch => {
-          const id = ch.id;
-          if (id.startsWith('subch_')) {
-            const row = ch.previousElementSibling;
-            if (row && row.getAttribute('onclick') && row.getAttribute('onclick').includes(key)) {
-              if (bucketType === 'csesCat') {
-                ch.innerHTML = renderCsesProblemRows(problems);
-              } else {
-                ch.innerHTML = renderProblemRows(problems);
-              }
-            }
+        bucketCacheRaw[cacheKey] = problems;
+
+        var parentType = getSectionForBucketType(bucketType);
+        var activeSort = subSectionSorts[cacheKey] || sectionSorts[parentType] || 'default';
+
+        var displayProblems = problems;
+        if (activeSort && activeSort !== 'default') {
+          displayProblems = sortProblemList(problems, activeSort);
+        }
+        bucketCache[cacheKey] = displayProblems;
+
+        var ch = null;
+        document.querySelectorAll('.tree-children').forEach(function(el) {
+          if (el.getAttribute('data-cache-key') === cacheKey) {
+            ch = el;
           }
         });
+
+        if (ch) {
+          if (bucketType === 'csesCat') {
+            ch.innerHTML = renderCsesProblemRows(displayProblems);
+          } else {
+            ch.innerHTML = renderProblemRows(displayProblems);
+          }
+        }
       }
     }
 
@@ -1293,6 +1912,13 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         key: 'seuCF.compilers',
         value: settingsData.compilers
       });
+    }
+
+    function handleCompilerInputChange(el) {
+      var lang = el.getAttribute('data-lang');
+      if (lang) {
+        onCompilerChange(lang, el.value);
+      }
     }
 
     function browseFolder(key) {
@@ -1366,12 +1992,12 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
       const table = document.getElementById('compilersTable');
       if (table && settings.compilers) {
         const languages = ['cpp', 'py', 'java', 'c', 'rs', 'go', 'js'];
-        table.innerHTML = languages.map(lang => {
+        table.innerHTML = languages.map(function(lang) {
           const cmd = settings.compilers[lang] || '';
-          return \`<tr>
-            <td style="width: 45px; font-weight: 500; color: #aaa;">\${lang.toUpperCase()}:</td>
-            <td><input type="text" value="\${escapeHtml(cmd)}" onchange="onCompilerChange('\${lang}', this.value)" /></td>
-          </tr>\`;
+          return '<tr>' +
+            '<td style="width: 45px; font-weight: 500; color: #aaa;">' + lang.toUpperCase() + ':</td>' +
+            '<td><input type="text" value="' + escapeHtml(cmd) + '" data-lang="' + lang + '" onchange="handleCompilerInputChange(this)" /></td>' +
+          '</tr>';
         }).join('');
       }
     }
@@ -1395,8 +2021,9 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
         // Re-render currently open top-level category if any
         document.querySelectorAll('.tree-children.open').forEach(ch => {
           const catId = ch.id.replace('ch_', '');
-          expandCategory(catId);
+          expandCategory(catId, true);
         });
+        document.querySelectorAll('.sort-select').forEach(adjustSelectWidth);
       } else if (msg.type === 'bucketData') {
         onBucketDataReceived(msg);
       } else if (msg.type === 'settingsData') {
@@ -1404,6 +2031,7 @@ export class ProblemsViewProvider implements vscode.WebviewViewProvider {
       }
     });
 
+    document.querySelectorAll('.sort-select').forEach(adjustSelectWidth);
     vscode.postMessage({ type: 'ready' });
   </script>
 </body>
